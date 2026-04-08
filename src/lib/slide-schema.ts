@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const ToneSchema = z.enum(["Professional", "Creative", "Minimalist"]);
+export const ProviderSchema = z.enum(["gemini", "sarvam"]);
 
 export const SlideSchema = z
   .object({
@@ -8,6 +9,8 @@ export const SlideSchema = z
     title: z.string().min(1).max(120),
     subtitle: z.string().max(180).optional(),
     content: z.string().max(400).optional(),
+    imageQuery: z.string().max(120).optional(),
+    imageUrl: z.string().url().max(500).optional(),
     bullets: z.array(z.string().max(180)).max(8).optional(),
     leftTitle: z.string().max(80).optional(),
     leftBullets: z.array(z.string().max(120)).max(6).optional(),
@@ -48,5 +51,6 @@ export const DeckResponseSchema = z.object({
 });
 
 export type ToneInput = z.infer<typeof ToneSchema>;
+export type ProviderInput = z.infer<typeof ProviderSchema>;
 export type SlideInput = z.infer<typeof SlideSchema>;
 export type DeckResponseInput = z.infer<typeof DeckResponseSchema>;

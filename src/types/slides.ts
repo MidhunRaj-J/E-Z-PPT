@@ -1,5 +1,7 @@
 export type Tone = "Professional" | "Creative" | "Minimalist";
 
+export type ApiProvider = "gemini" | "sarvam";
+
 export type SlideLayout =
   | "TITLE"
   | "BULLETS"
@@ -12,6 +14,8 @@ export type Slide = {
   title: string;
   subtitle?: string;
   content?: string;
+  imageQuery?: string;
+  imageUrl?: string;
   bullets?: string[];
   leftTitle?: string;
   leftBullets?: string[];

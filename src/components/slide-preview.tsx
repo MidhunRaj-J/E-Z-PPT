@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { Slide } from "@/types/slides";
 
 type SlidePreviewProps = {
@@ -19,10 +20,28 @@ export function SlidePreview({ slide, index }: SlidePreviewProps) {
       </div>
 
       <div className="card-lift relative aspect-video w-full overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-[0_14px_36px_rgba(15,23,42,0.08)]">
-        <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-blue-500 via-cyan-400 to-indigo-500" />
+        {slide.imageUrl && (
+          <>
+            <Image
+              src={slide.imageUrl}
+              alt={slide.imageQuery ? `${slide.imageQuery} background` : "Slide background"}
+              fill
+              sizes="(max-width: 1024px) 100vw, 1200px"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(255,255,255,0.65),transparent_44%)]" />
+            <div className="absolute inset-0 bg-gradient-to-br from-white/72 via-white/80 to-white/68" />
+          </>
+        )}
+        <div className="absolute inset-x-0 top-0 z-10 h-1.5 bg-gradient-to-r from-blue-500 via-cyan-400 to-indigo-500" />
+        {slide.imageQuery && (
+          <div className="absolute bottom-3 right-3 z-10 rounded-full border border-slate-200/70 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+            {slide.imageQuery}
+          </div>
+        )}
 
         {slide.layout === "TITLE" && (
-          <div className="relative flex h-full flex-col items-center justify-center text-center">
+          <div className="relative z-10 flex h-full flex-col items-center justify-center text-center">
             <div className="anim-float absolute left-8 top-8 h-24 w-24 rounded-full bg-blue-100/80 blur-2xl" />
             <div className="anim-float absolute bottom-8 right-12 h-20 w-20 rounded-full bg-cyan-100/80 blur-2xl" style={{ animationDelay: "1.2s" }} />
             <p className="soft-chip">Opening slide</p>
@@ -37,7 +56,7 @@ export function SlidePreview({ slide, index }: SlidePreviewProps) {
         )}
 
         {slide.layout === "BULLETS" && (
-          <div className="h-full">
+          <div className="relative z-10 h-full">
             <div className="flex items-start justify-between gap-4">
               <h2 className="text-3xl font-bold tracking-tight text-slate-900">{title}</h2>
               <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
@@ -71,7 +90,7 @@ export function SlidePreview({ slide, index }: SlidePreviewProps) {
         )}
 
         {slide.layout === "TWO_COLUMN" && (
-          <div className="h-full">
+          <div className="relative z-10 h-full">
             <div className="flex items-start justify-between gap-4">
               <h2 className="text-3xl font-bold tracking-tight text-slate-900">{title}</h2>
               <div className="flex gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -108,7 +127,7 @@ export function SlidePreview({ slide, index }: SlidePreviewProps) {
         )}
 
         {slide.layout === "QUOTE" && (
-          <div className="flex h-full items-center">
+          <div className="relative z-10 flex h-full items-center">
             <div className="mr-5 h-[72%] w-1.5 rounded-full bg-gradient-to-b from-blue-500 to-cyan-400" />
             <div>
               <p className="text-4xl leading-tight tracking-tight text-slate-900">“{slide.quote ?? ""}”</p>
@@ -119,7 +138,7 @@ export function SlidePreview({ slide, index }: SlidePreviewProps) {
         )}
 
         {slide.layout === "CLOSING" && (
-          <div className="relative flex h-full flex-col items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white text-center">
+          <div className="relative z-10 flex h-full flex-col items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white text-center">
             <div className="anim-float absolute inset-x-0 top-4 mx-auto h-14 w-56 rounded-full bg-blue-100/70 blur-2xl" />
             <h2 className="text-4xl font-bold tracking-tight text-slate-900">{title}</h2>
             <p className="mt-4 max-w-3xl text-xl text-slate-600">{slide.content ?? slide.subtitle ?? ""}</p>

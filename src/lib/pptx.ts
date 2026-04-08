@@ -43,6 +43,28 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
     const slide = pptx.addSlide();
 
     slide.background = { color: theme.bg };
+    if (slideData.imageUrl) {
+      try {
+        slide.addImage({
+          path: slideData.imageUrl,
+          x: 0,
+          y: 0,
+          w: 13.33,
+          h: 7.5,
+        });
+        slide.addShape(pptx.ShapeType.rect, {
+          x: 0,
+          y: 0,
+          w: 13.33,
+          h: 7.5,
+          fill: { color: "FFFFFF", transparency: 22 },
+          line: { color: "FFFFFF", pt: 0, transparency: 100 },
+        });
+      } catch {
+        // Keep plain theme background if a remote image cannot be embedded.
+      }
+    }
+
     slide.addShape(pptx.ShapeType.rect, {
       x: 0,
       y: 0,

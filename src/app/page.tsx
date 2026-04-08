@@ -6,13 +6,18 @@ import { ArrowRight, Download, Orbit, Sparkles, WandSparkles } from "lucide-reac
 import { LoadingDeck } from "../components/loading-deck";
 import { SlidePreview } from "../components/slide-preview";
 import { downloadDeck } from "../lib/pptx";
-import type { DeckResponse, Slide, Tone } from "../types/slides";
+import type { ApiProvider, DeckResponse, Slide, Tone } from "../types/slides";
 
 const tones: Tone[] = ["Professional", "Creative", "Minimalist"];
+const providers: Array<{ label: string; value: ApiProvider }> = [
+  { label: "Google Gemini", value: "gemini" },
+  { label: "Sarvam", value: "sarvam" },
+];
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [tone, setTone] = useState<Tone>("Professional");
+  const [provider, setProvider] = useState<ApiProvider>("gemini");
   const [slides, setSlides] = useState<Slide[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +43,7 @@ export default function Home() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: cleanedPrompt, tone }),
+        body: JSON.stringify({ prompt: cleanedPrompt, tone, provider }),
       });
 
       const data = (await res.json()) as DeckResponse | { error?: string };
@@ -140,7 +145,7 @@ export default function Home() {
             <span className="soft-chip">Fast generation</span>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1fr_220px_auto]">
+          <div className="grid gap-4 lg:grid-cols-[1fr_220px_220px_auto]">
             <div className="flex flex-col gap-2">
               <label htmlFor="deck-prompt" className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                 Presentation Topic
@@ -170,6 +175,24 @@ export default function Home() {
                 {tones.map((toneOption) => (
                   <option key={toneOption} value={toneOption}>
                     {toneOption}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label htmlFor="provider" className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                AI Provider
+              </label>
+              <select
+                id="provider"
+                value={provider}
+                onChange={(e) => setProvider(e.target.value as ApiProvider)}
+                className="h-12 rounded-2xl border border-slate-300 bg-white px-3 text-base font-semibold text-slate-900 outline-none transition focus:border-blue-500 focus:shadow-[0_0_0_3px_rgba(37,99,235,0.15)]"
+              >
+                {providers.map((providerOption) => (
+                  <option key={providerOption.value} value={providerOption.value}>
+                    {providerOption.label}
                   </option>
                 ))}
               </select>
