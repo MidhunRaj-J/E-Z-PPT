@@ -151,9 +151,13 @@ type LooseSlide = {
   imageUrl?: unknown;
   bullets?: unknown;
   leftTitle?: unknown;
+  leftBullets?: unknown;
   rightTitle?: unknown;
+  rightBullets?: unknown;
   quote?: unknown;
 };
+
+type SlideLayout = "TITLE" | "BULLETS" | "TWO_COLUMN" | "QUOTE" | "CLOSING";
 
 type UnsplashSearchResponse = {
   results?: Array<{
@@ -215,6 +219,50 @@ function inferImageQueryFromSlide(slide: LooseSlide, index: number) {
   return `business presentation slide ${index + 1}`;
 }
 
+function normalizeLayoutValue(value: unknown): SlideLayout | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const canonical = value.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  const layoutMap: Record<string, SlideLayout> = {
+    TITLE: "TITLE",
+    OPENING: "TITLE",
+    INTRO: "TITLE",
+    INTRODUCTION: "TITLE",
+    BULLETS: "BULLETS",
+    BULLET: "BULLETS",
+    POINTS: "BULLETS",
+    LIST: "BULLETS",
+    TWO_COLUMN: "TWO_COLUMN",
+    TWO_COLUMNS: "TWO_COLUMN",
+    COMPARISON: "TWO_COLUMN",
+    COMPARE: "TWO_COLUMN",
+    QUOTE: "QUOTE",
+    CLOSING: "CLOSING",
+    CONCLUSION: "CLOSING",
+    ENDING: "CLOSING",
+  };
+
+  return layoutMap[canonical] ?? null;
+}
+
+function inferLayoutFromSlide(slide: LooseSlide, index: number, totalSlides: number): SlideLayout {
+  if (index === 0) {
+    return "TITLE";
+  }
+  if (index === totalSlides - 1) {
+    return "CLOSING";
+  }
+  if (asNonEmptyString(slide.quote)) {
+    return "QUOTE";
+  }
+  if (Array.isArray(slide.leftBullets) && slide.leftBullets.length && Array.isArray(slide.rightBullets) && slide.rightBullets.length) {
+    return "TWO_COLUMN";
+  }
+  return "BULLETS";
+}
+
 function normalizeDeckShape(raw: unknown) {
   if (!raw || typeof raw !== "object") {
     return raw;
@@ -233,9 +281,11 @@ function normalizeDeckShape(raw: unknown) {
     const loose = slide as LooseSlide;
     const title = asNonEmptyString(loose.title) ?? inferTitleFromSlide(loose, index);
     const imageQuery = asNonEmptyString(loose.imageQuery) ?? inferImageQueryFromSlide(loose, index);
+    const layout = normalizeLayoutValue(loose.layout) ?? inferLayoutFromSlide(loose, index, deck.slides!.length);
 
     return {
       ...loose,
+      layout,
       title,
       imageQuery,
     };
