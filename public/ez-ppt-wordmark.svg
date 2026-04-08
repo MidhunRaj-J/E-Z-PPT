@@ -1,0 +1,17 @@
+<svg width="712" height="164" viewBox="0 0 712 164" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ezg" x1="18" y1="18" x2="146" y2="146" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="8" y="8" width="148" height="148" rx="34" fill="url(#ezg)"/>
+  <rect x="8" y="8" width="148" height="148" rx="34" stroke="#0F172A" stroke-opacity="0.08" stroke-width="2"/>
+
+  <path d="M42 52H124V68H66L118 120V136H40V120H96L42 68V52Z" fill="white"/>
+  <path d="M86 52H102V136H86V52Z" fill="white" fill-opacity="0.95"/>
+
+  <text x="190" y="86" fill="#0F172A" font-family="Manrope, Segoe UI, sans-serif" font-size="64" font-weight="800" letter-spacing="0.5">E-Z-PPT</text>
+  <text x="192" y="122" fill="#475569" font-family="Manrope, Segoe UI, sans-serif" font-size="24" font-weight="600" letter-spacing="1.2">AI PRESENTATION BUILDER</text>
+</svg>

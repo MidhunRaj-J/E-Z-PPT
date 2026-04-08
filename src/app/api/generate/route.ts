@@ -32,6 +32,10 @@ Rules:
 - Start with TITLE and end with CLOSING.
 - Use a mix of BULLETS, TWO_COLUMN, and QUOTE in the middle.
 - Keep text concise and specific.
+- For BULLETS slides, provide 4 to 6 bullets with practical details.
+- For TWO_COLUMN slides, provide 3 to 5 bullets in each column.
+- Include concrete examples, directional metrics, or outcomes whenever possible.
+- Add speakerNotes on most slides with a one-sentence presenter tip.
 - No markdown, no commentary, no code fences.`;
 
 type GeminiResponse = {
