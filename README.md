@@ -3,7 +3,7 @@
 E-Z-PPT turns a text prompt into a structured presentation workflow:
 
 1. The browser sends a topic and tone to the API.
-2. The API asks OpenAI for strict JSON slide data.
+2. The API asks Gemini for strict JSON slide data.
 3. The UI renders that JSON as slide previews.
 4. PptxGenJS converts the same JSON into a downloadable `.pptx` file.
 
@@ -21,7 +21,7 @@ E-Z-PPT turns a text prompt into a structured presentation workflow:
 - Next.js 16 with the App Router
 - React 19
 - Tailwind CSS 4
-- OpenAI API
+- Gemini API
 - `pptxgenjs`
 - `lucide-react`
 
@@ -39,11 +39,11 @@ npm install
 copy .env.example .env.local
 ```
 
-3. Add your OpenAI API key to `.env.local`:
+3. Add your Gemini API key to `.env.local`:
 
 ```env
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_MODEL=gpt-4o-mini
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
 4. Start the dev server:
@@ -58,7 +58,7 @@ npm run dev
 
 The app keeps a single slide schema in [src/types/slides.ts](src/types/slides.ts) and [src/lib/slide-schema.ts](src/lib/slide-schema.ts). The preview UI and PPTX export both read from that same structure, which keeps the browser rendering and the generated deck aligned.
 
-The generation endpoint lives in [src/app/api/generate/route.ts](src/app/api/generate/route.ts). It uses `response_format: { type: "json_object" }` and validates the result before sending it back to the client.
+The generation endpoint lives in [src/app/api/generate/route.ts](src/app/api/generate/route.ts). It asks Gemini for JSON, then validates the result before sending it back to the client.
 
 ## Scripts
 
@@ -69,5 +69,5 @@ The generation endpoint lives in [src/app/api/generate/route.ts](src/app/api/gen
 
 ## Notes
 
-- If you do not set `OPENAI_API_KEY`, the generation endpoint returns a server-side error.
+- If you do not set `GEMINI_API_KEY`, the generation endpoint returns a server-side error.
 - `pptxgenjs` uses the same slide JSON, so edits to the schema should stay consistent across preview and export.

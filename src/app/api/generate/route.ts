@@ -1,4 +1,3 @@
-import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { DeckResponseSchema, ToneSchema } from "@/lib/slide-schema";
 
@@ -35,13 +34,34 @@ Rules:
 - Keep text concise and specific.
 - No markdown, no commentary, no code fences.`;
 
+type GeminiResponse = {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+};
+
+function extractJsonText(response: GeminiResponse) {
+  const text = response.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
+  const trimmed = text.trim();
+
+  if (trimmed.startsWith("```")) {
+    return trimmed.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  }
+
+  return trimmed;
+}
+
 export async function POST(request: Request) {
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: "Server missing OPENAI_API_KEY. Add it to your .env.local file." },
+        { error: "Server missing GEMINI_API_KEY. Add it to your .env.local file." },
         { status: 500 },
       );
     }
@@ -62,23 +82,47 @@ export async function POST(request: Request) {
       );
     }
 
-    const client = new OpenAI({ apiKey });
-    const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+    const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-    const completion = await client.chat.completions.create({
-      model,
-      temperature: 0.7,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: `Topic: ${prompt}\nTone: ${parsedTone.data}\nAudience: General business audience.`,
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: systemPrompt }],
         },
-      ],
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: `Topic: ${prompt}\nTone: ${parsedTone.data}\nAudience: General business audience.`,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          responseMimeType: "application/json",
+        },
+      }),
     });
 
-    const content = completion.choices[0]?.message?.content;
+    if (!response.ok) {
+      const errorBody = await response.text();
+      return NextResponse.json(
+        {
+          error: `Gemini request failed with status ${response.status}. ${errorBody}`,
+        },
+        { status: 502 },
+      );
+    }
+
+    const result = (await response.json()) as GeminiResponse;
+    const content = extractJsonText(result);
 
     if (!content) {
       return NextResponse.json(
