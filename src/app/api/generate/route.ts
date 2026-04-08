@@ -297,6 +297,41 @@ function normalizeDeckShape(raw: unknown) {
   };
 }
 
+function ensureMinimumSlides(raw: unknown, minimum = 4) {
+  if (!raw || typeof raw !== "object") {
+    return raw;
+  }
+
+  const deck = raw as { slides?: Array<Record<string, unknown>> };
+  if (!Array.isArray(deck.slides)) {
+    return raw;
+  }
+
+  if (deck.slides.length >= minimum) {
+    return raw;
+  }
+
+  const expandedSlides = [...deck.slides];
+
+  while (expandedSlides.length < minimum) {
+    const source = expandedSlides[expandedSlides.length - 1] ?? expandedSlides[0] ?? {};
+    const nextIndex = expandedSlides.length + 1;
+    const fallbackTitle = asNonEmptyString(source.title) ?? `Slide ${nextIndex}`;
+
+    expandedSlides.push({
+      ...source,
+      layout: nextIndex === minimum ? "CLOSING" : "BULLETS",
+      title: `${fallbackTitle} (cont.)`,
+      imageQuery: asNonEmptyString(source.imageQuery) ?? `business strategy ${nextIndex}`,
+    });
+  }
+
+  return {
+    ...deck,
+    slides: expandedSlides,
+  };
+}
+
 async function fetchUnsplashImage(query: string, accessKey: string) {
   const endpoint = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&orientation=landscape&per_page=1&content_filter=high`;
   const response = await fetch(endpoint, {
@@ -493,7 +528,8 @@ export async function POST(request: Request) {
 
     const parsedJson = parseJsonFromModelOutput(content);
     const normalizedJson = normalizeDeckShape(parsedJson);
-    const enrichedJson = await enrichDeckWithUnsplash(normalizedJson);
+    const repairedJson = ensureMinimumSlides(normalizedJson, 4);
+    const enrichedJson = await enrichDeckWithUnsplash(repairedJson);
     const validated = DeckResponseSchema.parse(enrichedJson);
 
     return NextResponse.json(validated);
