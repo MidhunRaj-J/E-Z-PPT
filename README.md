@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-	<a href="https://github.com/jmidh/E-Z-PPT/stargazers"><img src="https://img.shields.io/github/stars/jmidh/E-Z-PPT?style=for-the-badge" alt="GitHub stars" /></a>
+	<a href="https://github.com/Midhunraj-J/E-Z-PPT/stargazers"><img src="https://img.shields.io/github/stars/Midhunraj-J/E-Z-PPT?style=for-the-badge" alt="GitHub stars" /></a>
 	<img src="https://img.shields.io/badge/version-0.1.0-blue?style=for-the-badge" alt="Version" />
 	<img src="https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js" alt="Next.js" />
 	<img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
