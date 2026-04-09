@@ -1,30 +1,43 @@
 # E-Z-PPT
 
-Build polished, image-rich PowerPoint decks from a single prompt in minutes.
+<p align="center">
+	<img src="public/ez-ppt-wordmark.svg" alt="E-Z-PPT" width="420" />
+</p>
 
-E-Z-PPT is a Next.js app that turns plain language into a structured slide deck, gives you an in-browser preview, and exports a ready-to-share `.pptx` file.
+<p align="center">
+	Turn one prompt into a polished, image-rich PowerPoint deck in minutes.
+</p>
 
-If this project saves you time, please star the repo.
+<p align="center">
+	<a href="https://github.com/jmidh/E-Z-PPT/stargazers"><img src="https://img.shields.io/github/stars/jmidh/E-Z-PPT?style=for-the-badge" alt="GitHub stars" /></a>
+	<img src="https://img.shields.io/badge/version-0.1.0-blue?style=for-the-badge" alt="Version" />
+	<img src="https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js" alt="Next.js" />
+	<img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+</p>
 
-## Why E-Z-PPT
+E-Z-PPT is a Next.js app that generates a structured slide deck from plain language, lets you review each slide in the browser, and exports a ready-to-share `.pptx` file.
 
-- Fast workflow: prompt -> preview -> export.
-- Better visuals by default: each slide can be enriched with Unsplash stock images.
-- Flexible AI backend: choose Gemini or Sarvam.
-- Safer output: schema validation and normalization reduce malformed model responses.
-- Single source of truth: preview and export use the same slide data model.
+If this project saves you time, give it a star.
+
+## Why This Exists
+
+Creating decent decks is usually repetitive and slow: outline ideas, write copy, hunt visuals, format slides, then export. E-Z-PPT compresses that into one flow.
+
+- Prompt once: describe your topic and intent.
+- Preview instantly: review slide content before download.
+- Export confidently: generate a polished `.pptx` from the same data model used in preview.
 
 ## Core Features
 
-- Prompt-driven deck generation (business-focused structure)
+- Prompt-driven deck generation with business-friendly structure
 - Tone presets: Professional, Creative, Minimalist
-- Provider switch: Gemini or Sarvam
-- Automatic image enrichment via Unsplash (`imageQuery` -> `imageUrl`)
-- Slide normalization and repair for common LLM output issues
-- Live slide preview UI before download
-- Premium `.pptx` export using `pptxgenjs`
+- AI provider switch: Gemini or Sarvam
+- Automatic image enrichment from Unsplash (`imageQuery` -> `imageUrl`)
+- Schema-driven output validation and normalization (Zod)
+- Live slide preview before export
+- High-quality PowerPoint export via `pptxgenjs`
 
-## Quick Start
+## Quick Start (Under 60 Seconds)
 
 1. Install dependencies.
 
@@ -32,13 +45,13 @@ If this project saves you time, please star the repo.
 npm install
 ```
 
-2. Create your local environment file.
+2. Create your local env file.
 
 ```bash
 copy .env.example .env.local
 ```
 
-3. Add API keys to `.env.local`.
+3. Add your API keys to `.env.local`.
 
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
@@ -51,7 +64,7 @@ SARVAM_API_URL=https://api.sarvam.ai/v1/chat/completions
 UNSPLASH_ACCESS_KEY=your_unsplash_access_key_here
 ```
 
-4. Start the app.
+4. Run the app.
 
 ```bash
 npm run dev
@@ -61,21 +74,21 @@ npm run dev
 
 ## How It Works
 
-1. Frontend sends prompt, tone, and provider.
-2. API calls the selected model provider and requests strict JSON.
-3. Server normalizes and repairs model output (layout/title/slide-count fallbacks).
-4. Server optionally enriches slides with Unsplash image URLs.
-5. Response is validated with Zod.
-6. UI renders previews and the exporter builds a matching `.pptx`.
+1. UI sends `prompt + tone + provider` to the generation API.
+2. API requests strict JSON from the selected model provider.
+3. Server repairs common LLM issues (missing layout/title/slide counts).
+4. Server enriches slides with optional Unsplash image URLs.
+5. Response is validated with Zod and returned to the client.
+6. Preview and `.pptx` export both use the same normalized slide model.
 
 ## Project Structure
 
-- `src/app/page.tsx`: main UI and generation controls
+- `src/app/page.tsx`: app UI and generation controls
 - `src/app/api/generate/route.ts`: generation pipeline and provider integration
-- `src/lib/slide-schema.ts`: Zod schemas and validation rules
-- `src/lib/pptx.ts`: PowerPoint rendering and file export
+- `src/lib/slide-schema.ts`: Zod schemas and validation
+- `src/lib/pptx.ts`: `.pptx` rendering logic
 - `src/components/slide-preview.tsx`: slide preview renderer
-- `src/types/slides.ts`: shared slide and deck types
+- `src/types/slides.ts`: shared deck/slide types
 
 ## Scripts
 
@@ -84,25 +97,25 @@ npm run dev
 - `npm run start`: run production server
 - `npm run lint`: run ESLint
 
-## Environment Notes
-
-- Missing provider key (`GEMINI_API_KEY` or `SARVAM_API_KEY`) will fail generation for that provider.
-- Missing `UNSPLASH_ACCESS_KEY` will not block generation; slides are returned without stock image enrichment.
-
 ## Contributing
 
 Contributions are welcome.
 
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes with clear commit messages
+3. Make your changes with clear commits
 4. Run `npm run lint`
-5. Open a pull request with before/after context
+5. Open a PR with before/after context
 
-## Roadmap Ideas
+When creating issues, label beginner-friendly tasks with `good first issue`.
 
-- Multiple visual themes per tone
-- Slide templates by use case (pitch, report, training, webinar)
-- Team sharing and version history
-- Speaker-note quality scoring
-- One-click PDF export
+## Launch Checklist
+
+- Add repository topics in GitHub settings (`nextjs`, `typescript`, `pptx`, `ai`, `productivity`)
+- Upload a social preview image in repo settings for better link sharing cards
+- Publish a demo video/GIF in the README hero section
+- Share launch post across X, Reddit, Show HN, and Product Hunt
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
