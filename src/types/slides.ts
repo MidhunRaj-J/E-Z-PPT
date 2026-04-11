@@ -30,6 +30,7 @@ export type Slide = {
     backgroundStyle: "minimal" | "glassmorphism" | "gradient" | "abstract";
     visualStyle: "modern" | "futuristic" | "corporate" | "startup";
     emphasis: "title" | "numbers" | "contrast" | "minimal";
+    layoutVariant?: "asymmetric" | "centered" | "split" | "editorial" | "grid";
   };
 };
 

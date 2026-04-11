@@ -36,7 +36,8 @@ Return ONLY valid JSON in this exact shape:
         "accentColor": "string (e.g. blue, purple, orange)",
         "backgroundStyle": "minimal | glassmorphism | gradient | abstract",
         "visualStyle": "modern | futuristic | corporate | startup",
-        "emphasis": "title | numbers | contrast | minimal"
+        "emphasis": "title | numbers | contrast | minimal",
+        "layoutVariant": "asymmetric | centered | split | editorial | grid"
       }
     }
   ]
@@ -59,9 +60,19 @@ Content Rules:
 
 Design Intelligence (CRITICAL):
 - Every slide must have a distinct visual identity.
-- Alternate between dark and light themes for contrast.
-- Use "gradient" or "neon" styles for high-impact slides (hook, solution, closing).
+- Keep decks mostly light or soft-gradient; use dark/neon sparingly and only when it strengthens clarity.
+- Use "gradient" for high-impact slides (hook, solution, closing), but preserve readability first.
 - Keep text minimal - let design breathe.
+
+Placement & Hierarchy Rules (MANDATORY):
+- One focal point per slide: title first, then one supporting visual, then supporting text.
+- Follow scan flow: top-left to center-right. Make first 2 lines carry the key message.
+- Use clear zones: Header (10-15% height), Content body (70-75%), Footer/CTA (10-15%).
+- Respect whitespace: avoid edge-to-edge text blocks and avoid clutter.
+- Bullets: 3-5 concise points, parallel wording, no wall-of-text paragraphs.
+- TWO_COLUMN: left = context/problem, right = approach/outcome.
+- QUOTE: short emotional pause, author line mandatory.
+- CLOSING: single call-to-action or memorable takeaway.
 
 Layout Strategy:
 - TITLE slide -> cinematic, bold, minimal text.
@@ -76,6 +87,8 @@ Image Strategy:
   GOOD: "futuristic team collaboration neon lighting"
 
 - Images should enhance mood, not just illustrate content.
+- Only attach image-driven backgrounds where meaningful (TITLE, QUOTE, CLOSING, and rare key section slides).
+- Prefer specific context words from the topic; avoid generic stock-photo words.
 
 Design Variation Rules:
 - Do NOT repeat same design settings across consecutive slides.
@@ -219,6 +232,7 @@ type NormalizedDesign = {
   backgroundStyle: "minimal" | "glassmorphism" | "gradient" | "abstract";
   visualStyle: "modern" | "futuristic" | "corporate" | "startup";
   emphasis: "title" | "numbers" | "contrast" | "minimal";
+  layoutVariant: "asymmetric" | "centered" | "split" | "editorial" | "grid";
 };
 
 type UnsplashSearchResponse = {
@@ -281,6 +295,86 @@ function inferImageQueryFromSlide(slide: LooseSlide, index: number) {
   return `business presentation slide ${index + 1}`;
 }
 
+function extractKeywords(text: string, limit = 6) {
+  const stopWords = new Set([
+    "the",
+    "and",
+    "for",
+    "with",
+    "from",
+    "that",
+    "this",
+    "into",
+    "your",
+    "our",
+    "their",
+    "about",
+    "slide",
+    "slides",
+    "presentation",
+    "business",
+    "general",
+    "audience",
+    "impact",
+    "solution",
+    "problem",
+  ]);
+
+  const tokens = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 2 && !stopWords.has(token));
+
+  const unique: string[] = [];
+  for (const token of tokens) {
+    if (!unique.includes(token)) {
+      unique.push(token);
+    }
+    if (unique.length >= limit) {
+      break;
+    }
+  }
+
+  return unique;
+}
+
+function buildContextAwareImageQuery(slide: Record<string, unknown>, deckKeywords: string[], index: number) {
+  const slideTitle = asNonEmptyString(slide.title) ?? "";
+  const slideSubtitle = asNonEmptyString(slide.subtitle) ?? "";
+  const candidate = asNonEmptyString(slide.imageQuery) ?? `${slideTitle} ${slideSubtitle}`;
+  const candidateKeywords = extractKeywords(candidate, 4);
+  const titleKeywords = extractKeywords(slideTitle, 3);
+
+  const merged = [...candidateKeywords, ...titleKeywords, ...deckKeywords].filter(Boolean);
+  const unique: string[] = [];
+  for (const token of merged) {
+    if (!unique.includes(token)) {
+      unique.push(token);
+    }
+    if (unique.length >= 5) {
+      break;
+    }
+  }
+
+  if (unique.length === 0) {
+    return `professional keynote story ${index + 1}`;
+  }
+
+  return unique.join(" ");
+}
+
+function shouldUseImageForSlide(slide: Record<string, unknown>, index: number, total: number) {
+  const layout = typeof slide.layout === "string" ? slide.layout : "BULLETS";
+  if (layout === "TITLE" || layout === "QUOTE" || layout === "CLOSING") {
+    return true;
+  }
+
+  const middle = Math.max(1, Math.floor(total / 2));
+  return layout === "TWO_COLUMN" && index === middle;
+}
+
 function normalizeLayoutValue(value: unknown): SlideLayout | null {
   if (typeof value !== "string") {
     return null;
@@ -326,6 +420,7 @@ function normalizeDesign(rawDesign: unknown, index: number): NormalizedDesign | 
   const bgToken = normalizeToken(design.backgroundStyle);
   const visualToken = normalizeToken(design.visualStyle);
   const emphasisToken = normalizeToken(design.emphasis);
+  const variantToken = normalizeToken(design.layoutVariant);
 
   const themeMap: Record<string, NormalizedDesign["theme"]> = {
     dark: "dark",
@@ -368,6 +463,19 @@ function normalizeDesign(rawDesign: unknown, index: number): NormalizedDesign | 
     simplicity: "minimal",
   };
 
+  const variantMap: Record<string, NormalizedDesign["layoutVariant"]> = {
+    asymmetric: "asymmetric",
+    left_heavy: "asymmetric",
+    centered: "centered",
+    center: "centered",
+    split: "split",
+    split_screen: "split",
+    editorial: "editorial",
+    magazine: "editorial",
+    grid: "grid",
+    cards: "grid",
+  };
+
   const fallbackTheme: NormalizedDesign["theme"] = index % 2 === 0 ? "dark" : "light";
 
   return {
@@ -376,6 +484,7 @@ function normalizeDesign(rawDesign: unknown, index: number): NormalizedDesign | 
     backgroundStyle: backgroundMap[bgToken] ?? "minimal",
     visualStyle: visualMap[visualToken] ?? "modern",
     emphasis: emphasisMap[emphasisToken] ?? "contrast",
+    layoutVariant: variantMap[variantToken] ?? "asymmetric",
   };
 }
 
@@ -449,15 +558,23 @@ function ensureMinimumSlides(raw: unknown, minimum = 4) {
 
   const expandedSlides = [...deck.slides];
 
+  const stripContinuationSuffix = (value: string) =>
+    value
+      .replace(/\s*\(cont\.\)\s*/gi, " ")
+      .replace(/\s+part\s+\d+$/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
   while (expandedSlides.length < minimum) {
     const source = expandedSlides[expandedSlides.length - 1] ?? expandedSlides[0] ?? {};
     const nextIndex = expandedSlides.length + 1;
-    const fallbackTitle = asNonEmptyString(source.title) ?? `Slide ${nextIndex}`;
+    const sourceTitle = asNonEmptyString(source.title) ?? `Slide ${nextIndex}`;
+    const baseTitle = stripContinuationSuffix(sourceTitle) || `Slide ${nextIndex}`;
 
     expandedSlides.push({
       ...source,
       layout: nextIndex === minimum ? "CLOSING" : "BULLETS",
-      title: `${fallbackTitle} (cont.)`,
+      title: `${baseTitle} Part ${nextIndex}`,
       imageQuery: asNonEmptyString(source.imageQuery) ?? `business strategy ${nextIndex}`,
     });
   }
@@ -521,6 +638,295 @@ function enforceBoundaryLayouts(raw: unknown) {
   };
 }
 
+function ensureLayoutContentRequirements(raw: unknown) {
+  if (!raw || typeof raw !== "object") {
+    return raw;
+  }
+
+  const deck = raw as { slides?: Array<Record<string, unknown>> };
+  if (!Array.isArray(deck.slides)) {
+    return raw;
+  }
+
+  const sanitizeText = (value: string) => {
+    const compact = value.replace(/\s+/g, " ").trim();
+    if (!compact) {
+      return "";
+    }
+
+    const lower = compact.toLowerCase();
+    const banned = new Set(["n/a", "na", "none", "tbd", "lorem ipsum", "placeholder", "-"]);
+    if (banned.has(lower)) {
+      return "";
+    }
+
+    return compact;
+  };
+
+  const toStringArray = (value: unknown) =>
+    Array.isArray(value)
+      ? value
+          .filter((item): item is string => typeof item === "string")
+          .map((item) => sanitizeText(item))
+          .filter(Boolean)
+      : [];
+
+  const cleanTitleForFallback = (value: string) =>
+    value
+      .replace(/\s*\(cont\.\)\s*/gi, " ")
+      .replace(/\s+part\s+\d+$/i, "")
+      .replace(/\bpart\s+\d+\b(?=.*\bpart\s+\d+\b)/gi, "")
+      .replace(/\s*[:|-]\s*$/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const slides = deck.slides.map((slide, index) => {
+    const layout = typeof slide.layout === "string" ? slide.layout : "BULLETS";
+    const rawTitle = sanitizeText(asNonEmptyString(slide.title) ?? `Slide ${index + 1}`) || `Slide ${index + 1}`;
+    const title = cleanTitleForFallback(rawTitle) || `Slide ${index + 1}`;
+    const content = sanitizeText(asNonEmptyString(slide.content) ?? "");
+    const subtitle = sanitizeText(asNonEmptyString(slide.subtitle) ?? "");
+
+    if (layout === "BULLETS") {
+      const bullets = toStringArray(slide.bullets);
+      while (bullets.length < 4) {
+        bullets.push(
+          bullets.length === 0
+            ? "Core insight"
+            : bullets.length === 1
+              ? "Supporting evidence or metric"
+              : bullets.length === 2
+                ? "Implication for the audience"
+                : "Recommended next step",
+        );
+      }
+      return {
+        ...slide,
+        title,
+        subtitle: subtitle || undefined,
+        content: content || undefined,
+        bullets,
+      };
+    }
+
+    if (layout === "TWO_COLUMN") {
+      const leftBullets = toStringArray(slide.leftBullets);
+      const rightBullets = toStringArray(slide.rightBullets);
+
+      while (leftBullets.length < 3) {
+        leftBullets.push(
+          leftBullets.length === 0
+            ? "Current state"
+            : leftBullets.length === 1
+              ? "Current challenge"
+              : "Observed impact",
+        );
+      }
+      while (rightBullets.length < 3) {
+        rightBullets.push(
+          rightBullets.length === 0
+            ? "Target state"
+            : rightBullets.length === 1
+              ? "Solution approach"
+              : "Expected result",
+        );
+      }
+
+      return {
+        ...slide,
+        title,
+        leftTitle: sanitizeText(asNonEmptyString(slide.leftTitle) ?? "") || "Current",
+        rightTitle: sanitizeText(asNonEmptyString(slide.rightTitle) ?? "") || "Future",
+        leftBullets,
+        rightBullets,
+      };
+    }
+
+    if (layout === "QUOTE") {
+      return {
+        ...slide,
+        title,
+        quote: sanitizeText(asNonEmptyString(slide.quote) ?? "") || `${title} drives measurable impact.`,
+        quoteAuthor: sanitizeText(asNonEmptyString(slide.quoteAuthor) ?? "") || "Presenter",
+      };
+    }
+
+    if (layout === "TITLE" || layout === "CLOSING") {
+      return {
+        ...slide,
+        title,
+        subtitle: subtitle || undefined,
+        content: content || subtitle || `${title} with clear narrative flow and actionable outcomes.`,
+      };
+    }
+
+    return {
+      ...slide,
+      title,
+      subtitle: subtitle || undefined,
+      content: content || undefined,
+    };
+  });
+
+  return {
+    ...deck,
+    slides,
+  };
+}
+
+function hashString(value: string) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash >>> 0);
+}
+
+function enforceDesignDirection(raw: unknown, seed: number) {
+  if (!raw || typeof raw !== "object") {
+    return raw;
+  }
+
+  const deck = raw as { slides?: Array<Record<string, unknown>> };
+  if (!Array.isArray(deck.slides) || deck.slides.length === 0) {
+    return raw;
+  }
+
+  const profiles = [
+    {
+      themeCycle: ["light", "gradient", "light", "light", "gradient", "light"] as NormalizedDesign["theme"][],
+      backgroundCycle: ["minimal", "glassmorphism", "gradient", "abstract"] as NormalizedDesign["backgroundStyle"][],
+      visualCycle: ["modern", "futuristic", "startup", "corporate"] as NormalizedDesign["visualStyle"][],
+      emphasisCycle: ["title", "contrast", "numbers", "minimal"] as NormalizedDesign["emphasis"][],
+      variantCycle: ["asymmetric", "centered", "split", "editorial", "grid"] as NormalizedDesign["layoutVariant"][],
+      accentCycle: ["blue", "orange", "teal", "indigo", "red", "cyan", "gold"],
+    },
+    {
+      themeCycle: ["gradient", "light", "light", "gradient", "light", "light"] as NormalizedDesign["theme"][],
+      backgroundCycle: ["glassmorphism", "abstract", "minimal", "gradient"] as NormalizedDesign["backgroundStyle"][],
+      visualCycle: ["startup", "corporate", "futuristic", "modern"] as NormalizedDesign["visualStyle"][],
+      emphasisCycle: ["contrast", "title", "minimal", "numbers"] as NormalizedDesign["emphasis"][],
+      variantCycle: ["split", "editorial", "grid", "asymmetric", "centered"] as NormalizedDesign["layoutVariant"][],
+      accentCycle: ["indigo", "gold", "teal", "blue", "orange", "purple", "red"],
+    },
+    {
+      themeCycle: ["light", "light", "gradient", "light", "gradient", "light"] as NormalizedDesign["theme"][],
+      backgroundCycle: ["gradient", "minimal", "abstract", "glassmorphism"] as NormalizedDesign["backgroundStyle"][],
+      visualCycle: ["futuristic", "modern", "corporate", "startup"] as NormalizedDesign["visualStyle"][],
+      emphasisCycle: ["numbers", "contrast", "title", "minimal"] as NormalizedDesign["emphasis"][],
+      variantCycle: ["grid", "asymmetric", "centered", "split", "editorial"] as NormalizedDesign["layoutVariant"][],
+      accentCycle: ["cyan", "red", "blue", "gold", "indigo", "teal", "orange"],
+    },
+  ] as const;
+
+  const profile = profiles[seed % profiles.length];
+  const themeOffset = seed % profile.themeCycle.length;
+  const bgOffset = (seed >> 2) % profile.backgroundCycle.length;
+  const visualOffset = (seed >> 4) % profile.visualCycle.length;
+  const emphasisOffset = (seed >> 6) % profile.emphasisCycle.length;
+  const variantOffset = (seed >> 7) % profile.variantCycle.length;
+  const accentOffset = (seed >> 8) % profile.accentCycle.length;
+
+  const slides: Array<Record<string, unknown>> = [];
+
+  for (let index = 0; index < deck.slides.length; index += 1) {
+    const slide = deck.slides[index];
+    const total = deck.slides.length;
+    const layout = typeof slide.layout === "string" ? slide.layout : "BULLETS";
+
+    const design: NormalizedDesign = {
+      theme: profile.themeCycle[(index + themeOffset) % profile.themeCycle.length],
+      accentColor: profile.accentCycle[(index + accentOffset) % profile.accentCycle.length],
+      backgroundStyle: profile.backgroundCycle[(index + bgOffset) % profile.backgroundCycle.length],
+      visualStyle: profile.visualCycle[(index + visualOffset) % profile.visualCycle.length],
+      emphasis: profile.emphasisCycle[(index + emphasisOffset) % profile.emphasisCycle.length],
+      layoutVariant: profile.variantCycle[(index + variantOffset) % profile.variantCycle.length],
+    };
+
+    if (layout === "TITLE") {
+      design.theme = "gradient";
+      design.backgroundStyle = seed % 3 === 0 ? "gradient" : "glassmorphism";
+      design.visualStyle = seed % 2 === 0 ? "startup" : "futuristic";
+      design.emphasis = "title";
+      design.layoutVariant = seed % 2 === 0 ? "centered" : "editorial";
+    }
+
+    if (layout === "CLOSING" || index === total - 1) {
+      design.theme = "gradient";
+      design.backgroundStyle = seed % 3 === 1 ? "abstract" : "gradient";
+      design.visualStyle = seed % 2 === 0 ? "futuristic" : "startup";
+      design.emphasis = "contrast";
+      design.layoutVariant = seed % 2 === 0 ? "split" : "centered";
+    }
+
+    const previous = index > 0 ? (slides[index - 1].design as Partial<NormalizedDesign> | undefined) : undefined;
+    if (
+      previous &&
+      previous.theme === design.theme &&
+      previous.backgroundStyle === design.backgroundStyle &&
+      previous.visualStyle === design.visualStyle &&
+      previous.layoutVariant === design.layoutVariant
+    ) {
+      design.visualStyle = profile.visualCycle[(index + visualOffset + 1) % profile.visualCycle.length];
+      design.backgroundStyle = profile.backgroundCycle[(index + bgOffset + 1) % profile.backgroundCycle.length];
+      design.emphasis = profile.emphasisCycle[(index + emphasisOffset + 1) % profile.emphasisCycle.length];
+      design.layoutVariant = profile.variantCycle[(index + variantOffset + 1) % profile.variantCycle.length];
+    }
+
+    slides.push({
+      ...slide,
+      design,
+    });
+  }
+
+  return {
+    ...deck,
+    slides,
+  };
+}
+
+function ensureDesignSchemaSafety(raw: unknown) {
+  if (!raw || typeof raw !== "object") {
+    return raw;
+  }
+
+  const deck = raw as { slides?: Array<Record<string, unknown>> };
+  if (!Array.isArray(deck.slides)) {
+    return raw;
+  }
+
+  const fallbackThemes: NormalizedDesign["theme"][] = ["dark", "light", "gradient", "neon"];
+  const fallbackBackgrounds: NormalizedDesign["backgroundStyle"][] = ["minimal", "glassmorphism", "gradient", "abstract"];
+  const fallbackVisuals: NormalizedDesign["visualStyle"][] = ["modern", "futuristic", "corporate", "startup"];
+  const fallbackEmphasis: NormalizedDesign["emphasis"][] = ["title", "numbers", "contrast", "minimal"];
+  const fallbackVariants: NormalizedDesign["layoutVariant"][] = ["asymmetric", "centered", "split", "editorial", "grid"];
+  const fallbackAccents = ["blue", "orange", "teal", "indigo"];
+
+  const slides = deck.slides.map((slide, index) => {
+    const normalized = normalizeDesign(slide.design, index);
+
+    const design: NormalizedDesign = {
+      theme: normalized?.theme ?? fallbackThemes[index % fallbackThemes.length],
+      accentColor: normalized?.accentColor ?? fallbackAccents[index % fallbackAccents.length],
+      backgroundStyle: normalized?.backgroundStyle ?? fallbackBackgrounds[index % fallbackBackgrounds.length],
+      visualStyle: normalized?.visualStyle ?? fallbackVisuals[index % fallbackVisuals.length],
+      emphasis: normalized?.emphasis ?? fallbackEmphasis[index % fallbackEmphasis.length],
+      layoutVariant: normalized?.layoutVariant ?? fallbackVariants[index % fallbackVariants.length],
+    };
+
+    return {
+      ...slide,
+      design,
+    };
+  });
+
+  return {
+    ...deck,
+    slides,
+  };
+}
+
 async function fetchUnsplashImage(query: string, accessKey: string) {
   const endpoint = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&orientation=landscape&per_page=1&content_filter=high`;
   const response = await fetch(endpoint, {
@@ -538,32 +944,60 @@ async function fetchUnsplashImage(query: string, accessKey: string) {
   return result.results?.[0]?.urls?.regular ?? null;
 }
 
-async function enrichDeckWithUnsplash(raw: unknown) {
+function sanitizeQueryForFallback(query: string) {
+  return query
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(",");
+}
+
+function getFallbackImageUrl(query: string, index: number) {
+  const tags = sanitizeQueryForFallback(query) || "business,presentation";
+  const seed = `${tags}-${index + 1}`;
+  return `https://picsum.photos/seed/${encodeURIComponent(seed)}/1600/900`;
+}
+
+async function enrichDeckWithImages(raw: unknown, prompt: string) {
   if (!raw || typeof raw !== "object") {
     return raw;
   }
 
   const accessKey = process.env.UNSPLASH_ACCESS_KEY;
-  if (!accessKey) {
-    return raw;
-  }
 
   const deck = raw as { slides?: Array<Record<string, unknown>> };
   if (!Array.isArray(deck.slides)) {
     return raw;
   }
 
+  const deckKeywords = extractKeywords(prompt, 5);
+  const totalSlides = deck.slides.length;
+
   const cache = new Map<string, string | null>();
 
   const slides = await Promise.all(
-    deck.slides.map(async (slide) => {
-      const imageQuery = asNonEmptyString(slide.imageQuery);
-      if (!imageQuery) {
+    deck.slides.map(async (slide, index) => {
+      if (!shouldUseImageForSlide(slide, index, totalSlides)) {
         return slide;
       }
 
+      const imageQuery = buildContextAwareImageQuery(slide, deckKeywords, index);
+
       if (!cache.has(imageQuery)) {
-        const imageUrl = await fetchUnsplashImage(imageQuery, accessKey);
+        let imageUrl: string | null = null;
+
+        if (accessKey) {
+          imageUrl = await fetchUnsplashImage(imageQuery, accessKey);
+        }
+
+        if (!imageUrl) {
+          imageUrl = getFallbackImageUrl(imageQuery, index);
+        }
+
         cache.set(imageQuery, imageUrl);
       }
 
@@ -574,6 +1008,7 @@ async function enrichDeckWithUnsplash(raw: unknown) {
 
       return {
         ...slide,
+        imageQuery,
         imageUrl,
       };
     }),
@@ -711,7 +1146,7 @@ export async function POST(request: Request) {
 
     const slideCount =
       typeof requestedSlideCount === "number" && Number.isFinite(requestedSlideCount)
-        ? Math.max(4, Math.min(12, Math.round(requestedSlideCount)))
+        ? Math.max(4, Math.min(30, Math.round(requestedSlideCount)))
         : 8;
 
     let content: string;
@@ -725,8 +1160,12 @@ export async function POST(request: Request) {
     const normalizedJson = normalizeDeckShape(parsedJson);
     const exactCountJson = ensureExactSlides(normalizedJson, slideCount);
     const boundaryLayoutsJson = enforceBoundaryLayouts(exactCountJson);
-    const repairedJson = ensureMinimumSlides(boundaryLayoutsJson, 4);
-    const enrichedJson = await enrichDeckWithUnsplash(repairedJson);
+    const repairedLayoutsJson = ensureLayoutContentRequirements(boundaryLayoutsJson);
+    const repairedJson = ensureMinimumSlides(repairedLayoutsJson, 4);
+    const designSeed = hashString(`${prompt}|${parsedTone.data}|${slideCount}|${Date.now()}|${Math.random()}`);
+    const designDirectedJson = enforceDesignDirection(repairedJson, designSeed);
+    const designSafeJson = ensureDesignSchemaSafety(designDirectedJson);
+    const enrichedJson = await enrichDeckWithImages(designSafeJson, prompt);
     const validated = DeckResponseSchema.parse(enrichedJson);
 
     return NextResponse.json(validated);

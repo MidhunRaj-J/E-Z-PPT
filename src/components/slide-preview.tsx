@@ -91,6 +91,11 @@ export function SlidePreview({ slide, index }: SlidePreviewProps) {
   const subTextColor = slide.design?.theme === "dark" || slide.design?.theme === "neon" ? "#94A3B8" : "#475569";
 
   const headingText = cfg.titleAllCaps ? (slide.title || `Slide ${index + 1}`).toUpperCase() : slide.title || `Slide ${index + 1}`;
+  const layoutVariant = slide.design?.layoutVariant ?? "asymmetric";
+  const centeredHeadings = layoutVariant === "centered" || concept === "clean_airy" || slide.design?.emphasis === "contrast";
+  const splitLayout = layoutVariant === "split";
+  const allowHeroImage = slide.layout === "TITLE" || slide.layout === "QUOTE" || slide.layout === "CLOSING";
+  const hasImage = Boolean(slide.imageUrl && allowHeroImage);
   const titleStyle = {
     fontFamily: cfg.titleFont,
     letterSpacing: cfg.titleSpacing,
@@ -98,6 +103,7 @@ export function SlidePreview({ slide, index }: SlidePreviewProps) {
     fontSize: `${Math.round(34 * cfg.titleScale)}px`,
     lineHeight: 1.1,
     color: textColor,
+    textAlign: centeredHeadings ? "center" : "left",
   } as const;
   const bodyStyle = {
     fontFamily: cfg.bodyFont,
@@ -105,10 +111,6 @@ export function SlidePreview({ slide, index }: SlidePreviewProps) {
     lineHeight: 1.5,
     color: subTextColor,
   } as const;
-
-  const bulletCount = slide.bullets?.length ?? 0;
-  const leftCount = slide.leftBullets?.length ?? 0;
-  const rightCount = slide.rightBullets?.length ?? 0;
 
   return (
     <article className="group w-full anim-reveal" data-delay={String((index % 3) + 1)}>
@@ -121,6 +123,9 @@ export function SlidePreview({ slide, index }: SlidePreviewProps) {
         className="card-lift relative aspect-video w-full overflow-hidden rounded-[1.5rem] border border-slate-200 p-6 shadow-[0_14px_36px_rgba(15,23,42,0.08)]"
         style={{ backgroundColor: themeBg }}
       >
+        {layoutVariant === "split" && <div className="absolute left-1/2 top-0 h-full w-[3px] -translate-x-1/2" style={{ backgroundColor: accent, opacity: 0.22 }} />}
+        {layoutVariant === "centered" && <div className="absolute left-1/2 top-3 h-1 w-36 -translate-x-1/2 rounded-full" style={{ backgroundColor: accent, opacity: 0.38 }} />}
+        {layoutVariant === "editorial" && <div className="absolute left-3 top-3 bottom-3 w-[3px] rounded" style={{ backgroundColor: accent, opacity: 0.8 }} />}
         {concept === "tech_grid" && (
           <div
             className="absolute inset-0"
@@ -133,10 +138,10 @@ export function SlidePreview({ slide, index }: SlidePreviewProps) {
         )}
         {concept === "editorial" && <div className="absolute left-2 top-5 bottom-5 w-1 rounded" style={{ backgroundColor: accent, opacity: 0.55 }} />}
         {concept === "bold_impact" && <div className="absolute -right-10 -top-10 h-48 w-48 rotate-12" style={{ backgroundColor: accent, opacity: 0.2 }} />}
-        {slide.imageUrl && (
+        {hasImage && (
           <>
             <Image
-              src={slide.imageUrl}
+              src={slide.imageUrl as string}
               alt={slide.imageQuery ? `${slide.imageQuery} background` : "Slide background"}
               fill
               sizes="(max-width: 1024px) 100vw, 1200px"
@@ -155,27 +160,10 @@ export function SlidePreview({ slide, index }: SlidePreviewProps) {
           </>
         )}
         <div className="absolute inset-x-0 top-0 z-10 h-1.5" style={{ background: `linear-gradient(to right, ${accent}, #38BDF8, #6366F1)` }} />
-        {slide.imageQuery && (
-          <div
-            className="absolute bottom-3 right-3 z-10 rounded-full border border-slate-200/70 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide"
-            style={{ color: subTextColor, fontFamily: cfg.bodyFont }}
-          >
-            {slide.imageQuery}
-          </div>
-        )}
-
         {slide.layout === "TITLE" && (
           <div className="relative z-10 flex h-full flex-col items-center justify-center text-center">
-            <div className="anim-float absolute left-8 top-8 h-24 w-24 rounded-full bg-blue-100/80 blur-2xl" />
-            <div className="anim-float absolute bottom-8 right-12 h-20 w-20 rounded-full bg-cyan-100/80 blur-2xl" style={{ animationDelay: "1.2s" }} />
-            <p className="soft-chip" style={{ color: textColor, borderColor: accent }}>Opening slide</p>
             <h2 className="mt-4 font-bold" style={titleStyle}>{headingText}</h2>
-            <p className="mt-4 max-w-3xl" style={{ ...bodyStyle, fontSize: `${Math.round(20 * cfg.bodyScale)}px` }}>{slide.content ?? slide.subtitle ?? ""}</p>
-            <div className="mt-6 flex gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1" style={{ color: subTextColor, borderColor: accent }}>Context</span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1" style={{ color: subTextColor, borderColor: accent }}>Objective</span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1" style={{ color: subTextColor, borderColor: accent }}>Outcome</span>
-            </div>
+            <p className="mt-4 max-w-3xl" style={{ ...bodyStyle, fontSize: `${Math.round(20 * cfg.bodyScale)}px`, textAlign: splitLayout ? "left" : centeredHeadings ? "center" : "left" }}>{slide.content ?? slide.subtitle ?? ""}</p>
           </div>
         )}
 
@@ -183,12 +171,9 @@ export function SlidePreview({ slide, index }: SlidePreviewProps) {
           <div className="relative z-10 h-full">
             <div className="flex items-start justify-between gap-4">
               <h2 className="font-bold" style={titleStyle}>{headingText}</h2>
-              <span className="rounded-full border bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide" style={{ borderColor: accent, color: accent, fontFamily: cfg.bodyFont }}>
-                {bulletCount} points
-              </span>
             </div>
 
-            <div className="mt-5 grid h-[74%] grid-cols-[1fr_280px] gap-4">
+            <div className="mt-5 grid h-[74%] gap-4 grid-cols-1">
               <ul className="space-y-3" style={bodyStyle}>
                 {(slide.bullets ?? []).map((bullet) => (
                   <li key={bullet} className="flex items-start gap-3 leading-relaxed">
@@ -197,18 +182,6 @@ export function SlidePreview({ slide, index }: SlidePreviewProps) {
                   </li>
                 ))}
               </ul>
-
-              <aside className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: accent, fontFamily: cfg.bodyFont }}>Key takeaway</p>
-                <p className="mt-2 text-sm font-semibold leading-relaxed" style={{ color: textColor, fontFamily: cfg.bodyFont }}>
-                  {slide.bullets?.[0] ?? "Highlight your strongest idea here."}
-                </p>
-                <div className="mt-4 h-px bg-slate-200" />
-                <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: subTextColor, fontFamily: cfg.bodyFont }}>Presenter cue</p>
-                <p className="mt-2 text-sm leading-relaxed" style={{ color: subTextColor, fontFamily: cfg.bodyFont }}>
-                  {slide.speakerNotes ?? "Add one concrete example or quick metric while presenting this slide."}
-                </p>
-              </aside>
             </div>
           </div>
         )}
@@ -217,13 +190,9 @@ export function SlidePreview({ slide, index }: SlidePreviewProps) {
           <div className="relative z-10 h-full">
             <div className="flex items-start justify-between gap-4">
               <h2 className="font-bold" style={titleStyle}>{headingText}</h2>
-              <div className="flex gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1" style={{ color: subTextColor }}>{leftCount} left</span>
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1" style={{ color: subTextColor }}>{rightCount} right</span>
-              </div>
             </div>
 
-            <div className="mt-5 grid h-[72%] grid-cols-2 gap-4">
+            <div className={`mt-5 grid h-[72%] gap-4 ${layoutVariant === "editorial" ? "grid-cols-[1.08fr_0.92fr]" : "grid-cols-2"}`}>
               <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: accent, fontFamily: cfg.bodyFont }}>{slide.leftTitle ?? "Column A"}</h3>
                 <ul className="mt-2 space-y-1.5 text-sm leading-relaxed" style={{ color: textColor, fontFamily: cfg.bodyFont }}>
@@ -242,11 +211,6 @@ export function SlidePreview({ slide, index }: SlidePreviewProps) {
               </section>
             </div>
 
-            <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: subTextColor, fontFamily: cfg.bodyFont }}>
-              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">Compare</span>
-              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">Trade-offs</span>
-              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">Decision</span>
-            </div>
           </div>
         )}
 
@@ -256,21 +220,14 @@ export function SlidePreview({ slide, index }: SlidePreviewProps) {
             <div>
               <p className="leading-tight tracking-tight" style={{ ...titleStyle, fontSize: `${Math.round(40 * cfg.titleScale)}px` }}>“{slide.quote ?? ""}”</p>
               <p className="mt-5" style={{ ...bodyStyle, fontWeight: 700, fontSize: `${Math.round(22 * cfg.bodyScale)}px` }}>{slide.quoteAuthor ? `- ${slide.quoteAuthor}` : ""}</p>
-              <p className="mt-4 text-sm" style={bodyStyle}>Use this moment to reinforce the strategic core of your narrative.</p>
             </div>
           </div>
         )}
 
         {slide.layout === "CLOSING" && (
           <div className="relative z-10 flex h-full flex-col items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white text-center">
-            <div className="anim-float absolute inset-x-0 top-4 mx-auto h-14 w-56 rounded-full bg-blue-100/70 blur-2xl" />
             <h2 className="font-bold" style={titleStyle}>{headingText}</h2>
-            <p className="mt-4 max-w-3xl" style={{ ...bodyStyle, fontSize: `${Math.round(20 * cfg.bodyScale)}px` }}>{slide.content ?? slide.subtitle ?? ""}</p>
-            <div className="mt-6 flex gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1" style={{ color: subTextColor, borderColor: accent }}>Q&A</span>
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1" style={{ color: subTextColor, borderColor: accent }}>Next Steps</span>
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1" style={{ color: subTextColor, borderColor: accent }}>Contact</span>
-            </div>
+            <p className="mt-4 max-w-3xl" style={{ ...bodyStyle, fontSize: `${Math.round(20 * cfg.bodyScale)}px`, textAlign: splitLayout ? "left" : centeredHeadings ? "center" : "left" }}>{slide.content ?? slide.subtitle ?? ""}</p>
           </div>
         )}
       </div>

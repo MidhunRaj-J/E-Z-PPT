@@ -209,7 +209,7 @@ export default function Home() {
                 onChange={(e) => setSlideCount(Number(e.target.value))}
                 className="h-12 rounded-2xl border border-slate-300 bg-white px-3 text-base font-semibold text-slate-900 outline-none transition focus:border-blue-500 focus:shadow-[0_0_0_3px_rgba(37,99,235,0.15)]"
               >
-                {Array.from({ length: 9 }, (_, index) => {
+                {Array.from({ length: 27 }, (_, index) => {
                   const count = index + 4;
                   return (
                     <option key={count} value={count}>

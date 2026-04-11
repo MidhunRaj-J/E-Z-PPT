@@ -26,6 +26,7 @@ export const SlideSchema = z
         backgroundStyle: z.enum(["minimal", "glassmorphism", "gradient", "abstract"]),
         visualStyle: z.enum(["modern", "futuristic", "corporate", "startup"]),
         emphasis: z.enum(["title", "numbers", "contrast", "minimal"]),
+        layoutVariant: z.enum(["asymmetric", "centered", "split", "editorial", "grid"]).optional(),
       })
       .optional(),
   })
@@ -56,7 +57,7 @@ export const SlideSchema = z
   });
 
 export const DeckResponseSchema = z.object({
-  slides: z.array(SlideSchema).min(4).max(12),
+  slides: z.array(SlideSchema).min(4).max(30),
 });
 
 export type ToneInput = z.infer<typeof ToneSchema>;

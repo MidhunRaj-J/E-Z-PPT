@@ -20,6 +20,12 @@ type SlideLook = {
   bodyFont: string;
   bg: string;
   panel: string;
+  surface: string;
+  text: string;
+  muted: string;
+  inverseText: string;
+  emphasis: "title" | "numbers" | "contrast" | "minimal";
+  layoutVariant: "asymmetric" | "centered" | "split" | "editorial" | "grid";
   backgroundStyle: BackgroundStyle;
   concept: "editorial" | "tech_grid" | "bold_impact" | "clean_airy";
   titleScale: number;
@@ -88,7 +94,12 @@ function resolveSlideLook(slide: Slide, theme: Theme, index: number): SlideLook 
           ? "EAF1FF"
           : theme.bg;
 
-  const panel = requestedTheme === "dark" || requestedTheme === "neon" ? "1E293B" : theme.panel;
+  const isDarkTheme = requestedTheme === "dark" || requestedTheme === "neon";
+  const panel = isDarkTheme ? "1E293B" : theme.panel;
+  const surface = isDarkTheme ? "0F172A" : theme.surface;
+  const text = isDarkTheme ? "E2E8F0" : theme.text;
+  const muted = isDarkTheme ? "94A3B8" : theme.muted;
+  const inverseText = isDarkTheme ? "0B1220" : theme.inverseText;
 
   const concept = ((): SlideLook["concept"] => {
     if (slide.design?.visualStyle === "futuristic") {
@@ -153,6 +164,12 @@ function resolveSlideLook(slide: Slide, theme: Theme, index: number): SlideLook 
     bodyFont: cfg.bodyFont || fonts.body,
     bg,
     panel,
+    surface,
+    text,
+    muted,
+    inverseText,
+    emphasis: slide.design?.emphasis ?? "contrast",
+    layoutVariant: slide.design?.layoutVariant ?? "asymmetric",
     backgroundStyle: slide.design?.backgroundStyle ?? "minimal",
     concept,
     titleScale: cfg.titleScale,
@@ -167,7 +184,6 @@ function addBackgroundEffects(
   pptx: pptxgen,
   slide: pptxgen.Slide,
   look: SlideLook,
-  theme: Theme,
 ) {
   if (look.backgroundStyle === "gradient") {
     slide.addShape(pptx.ShapeType.rect, {
@@ -183,8 +199,8 @@ function addBackgroundEffects(
       y: 2.6,
       w: 13.33,
       h: 2.4,
-      fill: { color: theme.surface, transparency: 74 },
-      line: { color: theme.surface, pt: 0 },
+      fill: { color: look.surface, transparency: 74 },
+      line: { color: look.surface, pt: 0 },
     });
     slide.addShape(pptx.ShapeType.rect, {
       x: 0,
@@ -204,7 +220,6 @@ function addBackgroundEffects(
       h: 6.35,
       fill: { color: "FFFFFF", transparency: 78 },
       line: { color: "FFFFFF", pt: 1, transparency: 36 },
-      radius: 0.14,
     });
   }
 
@@ -301,9 +316,59 @@ const themes: Record<Tone, Theme> = {
   },
 };
 
+async function blobToDataUrl(blob: Blob) {
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        resolve(result);
+        return;
+      }
+      reject(new Error("Unable to convert image blob to data URL."));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Failed reading image blob."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function fetchImageAsDataUrl(url: string) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 9000);
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      mode: "cors",
+      cache: "no-store",
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.startsWith("image/")) {
+      return null;
+    }
+
+    const blob = await response.blob();
+    if (!blob.size) {
+      return null;
+    }
+
+    return await blobToDataUrl(blob);
+  } catch {
+    return null;
+  }
+}
+
 export async function downloadDeck(slides: Slide[], tone: Tone) {
   const pptx = new pptxgen();
   const theme = themes[tone];
+  const imageDataCache = new Map<string, string | null>();
 
   pptx.layout = "LAYOUT_WIDE";
   pptx.author = "E-Z-PPT";
@@ -311,20 +376,34 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
   pptx.subject = "AI generated deck";
   pptx.title = "E-Z-PPT Deck";
 
-  slides.forEach((slideData, index) => {
+  for (const [index, slideData] of slides.entries()) {
     const slide = pptx.addSlide();
-    const hasImage = Boolean(slideData.imageUrl);
+    const allowHeroImage = slideData.layout === "TITLE" || slideData.layout === "QUOTE" || slideData.layout === "CLOSING";
+    const hasImage = Boolean(slideData.imageUrl && allowHeroImage);
     const look = resolveSlideLook(slideData, theme, index);
     const heading = slideData.title || `Slide ${index + 1}`;
     const headingText = look.titleAllCaps ? heading.toUpperCase() : heading;
     const titleSize = (base: number) => Math.max(12, Math.round(base * look.titleScale));
     const bodySize = (base: number) => Math.max(9, Math.round(base * look.bodyScale));
+    const centeredHeadings = look.layoutVariant === "centered" || look.concept === "clean_airy" || look.emphasis === "contrast";
+    const splitLayout = look.layoutVariant === "split";
+    const editorialLayout = look.layoutVariant === "editorial";
+    const titleHeadingX = centeredHeadings ? 1.1 : 1.35;
+    const titleHeadingW = centeredHeadings ? 11.1 : 10.5;
+    const titleHeadingAlign: "left" | "center" = centeredHeadings ? "center" : "left";
 
     slide.background = { color: look.bg };
-    if (slideData.imageUrl) {
-      try {
+    if (hasImage) {
+      const imageUrl = slideData.imageUrl as string;
+      if (!imageDataCache.has(imageUrl)) {
+        imageDataCache.set(imageUrl, await fetchImageAsDataUrl(imageUrl));
+      }
+
+      const imageData = imageDataCache.get(imageUrl);
+
+      if (imageData) {
         slide.addImage({
-          path: slideData.imageUrl,
+          data: imageData,
           x: 0,
           y: 0,
           w: 13.33,
@@ -346,8 +425,6 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
           fill: { color: look.bg, transparency: 70 },
           line: { color: look.bg, pt: 0 },
         });
-      } catch {
-        // Keep plain theme background if a remote image cannot be embedded.
       }
     } else {
       slide.addShape(pptx.ShapeType.ellipse, {
@@ -368,59 +445,71 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
       });
     }
 
-    addBackgroundEffects(pptx, slide, look, theme);
+    addBackgroundEffects(pptx, slide, look);
 
-    slide.addShape(pptx.ShapeType.rect, {
-      x: 0,
-      y: 0,
-      w: 4.44,
-      h: 0.16,
-      fill: { color: look.accent },
-      line: { color: look.accent, pt: 0 },
-    });
-    slide.addShape(pptx.ShapeType.rect, {
-      x: 4.44,
-      y: 0,
-      w: 4.44,
-      h: 0.16,
-      fill: { color: theme.text },
-      line: { color: theme.text, pt: 0 },
-    });
-    slide.addShape(pptx.ShapeType.rect, {
-      x: 8.88,
-      y: 0,
-      w: 4.45,
-      h: 0.16,
-      fill: { color: theme.muted },
-      line: { color: theme.muted, pt: 0 },
-    });
-    slide.addShape(pptx.ShapeType.line, {
-      x: 0.6,
-      y: 0.4,
-      w: 2,
-      h: 0,
-      line: { color: look.accent, pt: 2 },
-    });
-    slide.addShape(pptx.ShapeType.roundRect, {
-      x: 10.75,
-      y: 0.2,
-      w: 1.95,
-      h: 0.36,
-      fill: { color: theme.surface, transparency: 8 },
-      line: { color: "CDD7E7", pt: 1 },
-    });
-    slide.addText(`SLIDE ${index + 1}`, {
-      x: 10.82,
-      y: 0.29,
-      w: 1.82,
-      h: 0.18,
-      align: "center",
-      fontSize: bodySize(10),
-      bold: true,
-      color: theme.text,
-      charSpace: 1,
-      fontFace: look.bodyFont,
-    });
+    if (look.layoutVariant === "asymmetric") {
+      slide.addShape(pptx.ShapeType.rect, {
+        x: 0,
+        y: 0,
+        w: 5.9,
+        h: 0.16,
+        fill: { color: look.accent },
+        line: { color: look.accent, pt: 0 },
+      });
+      slide.addShape(pptx.ShapeType.rect, {
+        x: 5.9,
+        y: 0,
+        w: 7.43,
+        h: 0.16,
+        fill: { color: look.text },
+        line: { color: look.text, pt: 0 },
+      });
+    } else if (look.layoutVariant === "centered") {
+      slide.addShape(pptx.ShapeType.roundRect, {
+        x: 5.16,
+        y: 0.2,
+        w: 3,
+        h: 0.18,
+        fill: { color: look.accent, transparency: 12 },
+        line: { color: look.accent, pt: 0 },
+      });
+    } else if (look.layoutVariant === "split") {
+      slide.addShape(pptx.ShapeType.rect, {
+        x: 6.61,
+        y: 0,
+        w: 0.11,
+        h: 7.5,
+        fill: { color: look.accent, transparency: 22 },
+        line: { color: look.accent, pt: 0 },
+      });
+    } else if (look.layoutVariant === "editorial") {
+      slide.addShape(pptx.ShapeType.rect, {
+        x: 0.32,
+        y: 0.26,
+        w: 0.07,
+        h: 6.95,
+        fill: { color: look.accent, transparency: 0 },
+        line: { color: look.accent, pt: 0 },
+      });
+      slide.addShape(pptx.ShapeType.line, {
+        x: 0.6,
+        y: 0.5,
+        w: 2.4,
+        h: 0,
+        line: { color: look.accent, pt: 1.6 },
+      });
+    } else {
+      for (let i = 0; i < 4; i += 1) {
+        slide.addShape(pptx.ShapeType.roundRect, {
+          x: 0.6 + i * 0.34,
+          y: 0.24,
+          w: 0.2,
+          h: 0.2,
+          fill: { color: i % 2 === 0 ? look.accent : look.text, transparency: 18 },
+          line: { color: i % 2 === 0 ? look.accent : look.text, pt: 0 },
+        });
+      }
+    }
 
     if (slideData.layout === "TITLE") {
       slide.addShape(pptx.ShapeType.roundRect, {
@@ -428,85 +517,51 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
         y: 1,
         w: 11.2,
         h: 5.75,
-        fill: { color: theme.surface, transparency: hasImage ? 18 : 4 },
+        fill: { color: look.surface, transparency: hasImage ? 18 : 4 },
         line: { color: "CED8E9", pt: 1 },
       });
-      slide.addText("OPENING FRAME", {
-        x: 1.35,
-        y: 1.35,
-        w: 2.8,
-        h: 0.24,
-        align: "left",
-        bold: true,
-        fontSize: 10,
-        color: look.accent,
-        charSpace: 1,
-        fontFace: look.bodyFont,
-      });
       slide.addText(headingText, {
-        x: 1.39,
+        x: titleHeadingX + 0.04,
         y: 1.99,
-        w: 10.5,
+        w: titleHeadingW,
         h: 1.95,
-        align: "left",
+        align: titleHeadingAlign,
         bold: true,
         fontSize: titleSize(46),
         color: look.accent,
         breakLine: true,
         fontFace: look.titleFont,
         transparency: 78,
-        charSpace: look.titleCharSpace,
       });
       slide.addText(headingText, {
-        x: 1.35,
+        x: titleHeadingX,
         y: 1.95,
-        w: 10.5,
+        w: titleHeadingW,
         h: 1.95,
-        align: "left",
+        align: titleHeadingAlign,
         bold: true,
         fontSize: titleSize(46),
-        color: theme.text,
+        color: look.text,
         breakLine: true,
         fontFace: look.titleFont,
         italic: look.titleItalic,
-        charSpace: look.titleCharSpace,
       });
       slide.addShape(pptx.ShapeType.roundRect, {
-        x: 1.35,
+        x: splitLayout ? 1.0 : 1.35,
         y: 4.58,
-        w: 8.35,
+        w: splitLayout ? 11.2 : 8.35,
         h: 1.2,
         fill: { color: look.panel, transparency: 8 },
         line: { color: "D3DDEC", pt: 1 },
       });
       slide.addText(slideData.content ?? slideData.subtitle ?? "", {
-        x: 1.65,
+        x: splitLayout ? 1.3 : centeredHeadings ? 1.4 : 1.65,
         y: 4.9,
-        w: 7.95,
+        w: splitLayout ? 10.6 : centeredHeadings ? 7.8 : 7.95,
         h: 0.78,
-        align: "left",
+        align: centeredHeadings ? "center" : "left",
         fontSize: bodySize(18),
-        color: theme.muted,
-        breakLine: true,
-        fontFace: look.bodyFont,
-      });
-      slide.addShape(pptx.ShapeType.roundRect, {
-        x: 9.95,
-        y: 4.58,
-        w: 2.05,
-        h: 1.2,
-        fill: { color: look.accent, transparency: 4 },
-        line: { color: look.accent, pt: 0 },
-      });
-      slide.addText("CONTEXT\nOBJECTIVE\nOUTCOME", {
-        x: 10.09,
-        y: 4.73,
-        w: 1.77,
-        h: 0.98,
-        align: "center",
-        fontSize: 9,
-        bold: true,
-        color: theme.inverseText,
+        color: look.muted,
         breakLine: true,
         fontFace: look.bodyFont,
       });
@@ -518,107 +573,50 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
         y: 0.95,
         w: 8.85,
         h: 5.95,
-        fill: { color: theme.surface, transparency: hasImage ? 16 : 3 },
+        fill: { color: look.surface, transparency: hasImage ? 16 : 3 },
         line: { color: "CFD9E8", pt: 1 },
       });
-      slide.addShape(pptx.ShapeType.roundRect, {
-        x: 9.95,
-        y: 0.95,
-        w: 2.35,
-        h: 5.95,
-        fill: { color: look.panel, transparency: hasImage ? 16 : 2 },
-        line: { color: "CFD9E8", pt: 1 },
-      });
-      slide.addText(heading, {
+      slide.addText(headingText, {
         x: 1.2,
         y: 1.18,
-        w: 8.2,
+        w: 10.8,
         h: 0.8,
         bold: true,
         fontSize: titleSize(30),
-        color: theme.text,
+        color: look.text,
         fontFace: look.titleFont,
         italic: look.titleItalic,
-        charSpace: look.titleCharSpace,
+        align: centeredHeadings ? "center" : "left",
       });
       const bullets = (slideData.bullets ?? []).map((b) => ({ text: b, options: { bullet: { indent: 18 } } }));
       slide.addText(bullets, {
         x: 1.2,
         y: 2.13,
-        w: 8.2,
+        w: 10.8,
         h: 4.4,
         fontSize: bodySize(16),
-        color: theme.text,
+        color: look.text,
         breakLine: true,
         paraSpaceAfter: 9,
-        fontFace: look.bodyFont,
-      });
-
-      slide.addText("KEY TAKEAWAY", {
-        x: 10.17,
-        y: 1.25,
-        w: 1.95,
-        h: 0.28,
-        bold: true,
-        fontSize: 10,
-        color: look.accent,
-        charSpace: 0.8,
-        fontFace: look.bodyFont,
-      });
-      slide.addText(slideData.bullets?.[0] ?? "Primary insight", {
-        x: 10.17,
-        y: 1.67,
-        w: 1.95,
-        h: 1.5,
-        fontSize: bodySize(12),
-        color: theme.text,
-        breakLine: true,
-        fontFace: look.bodyFont,
-      });
-      slide.addShape(pptx.ShapeType.line, {
-        x: 10.17,
-        y: 3.45,
-        w: 1.9,
-        h: 0,
-        line: { color: "C7D2E5", pt: 1 },
-      });
-      slide.addText("PRESENTER NOTE", {
-        x: 10.17,
-        y: 3.62,
-        w: 1.95,
-        h: 0.25,
-        bold: true,
-        fontSize: 9,
-        color: theme.muted,
-        fontFace: look.bodyFont,
-      });
-      slide.addText(slideData.speakerNotes ?? "Share one short example to make this point concrete.", {
-        x: 10.17,
-        y: 3.9,
-        w: 1.95,
-        h: 1.9,
-        fontSize: bodySize(10),
-        color: theme.muted,
-        breakLine: true,
         fontFace: look.bodyFont,
       });
     }
 
     if (slideData.layout === "TWO_COLUMN") {
       slide.addShape(pptx.ShapeType.roundRect, {
-        x: 0.9,
+        x: editorialLayout ? 0.7 : 0.9,
         y: 1.72,
-        w: 5.74,
+        w: editorialLayout ? 5.94 : 5.74,
         h: 5,
-        fill: { color: theme.surface, transparency: hasImage ? 16 : 3 },
+        fill: { color: look.surface, transparency: hasImage ? 16 : 3 },
         line: { color: "CCD8E8", pt: 1 },
       });
       slide.addShape(pptx.ShapeType.roundRect, {
-        x: 6.69,
+        x: editorialLayout ? 6.64 : 6.69,
         y: 1.72,
-        w: 5.74,
+        w: editorialLayout ? 5.94 : 5.74,
         h: 5,
-        fill: { color: theme.surface, transparency: hasImage ? 16 : 3 },
+        fill: { color: look.surface, transparency: hasImage ? 16 : 3 },
         line: { color: "CCD8E8", pt: 1 },
       });
       slide.addText(headingText, {
@@ -628,10 +626,10 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
         h: 0.8,
         bold: true,
         fontSize: titleSize(31),
-        color: theme.text,
+        color: look.text,
         fontFace: look.titleFont,
         italic: look.titleItalic,
-        charSpace: look.titleCharSpace,
+        align: centeredHeadings ? "center" : "left",
       });
 
       slide.addText(slideData.leftTitle ?? "Column A", {
@@ -642,7 +640,6 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
         fontSize: 17,
         bold: true,
         color: look.accent,
-        charSpace: 0.5,
         fontFace: look.bodyFont,
       });
       slide.addText(
@@ -653,7 +650,7 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
           w: 5,
           h: 3.95,
           fontSize: bodySize(15),
-          color: theme.text,
+          color: look.text,
           breakLine: true,
           paraSpaceAfter: 8,
           fontFace: look.bodyFont,
@@ -668,7 +665,6 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
         fontSize: 17,
         bold: true,
         color: look.accent,
-        charSpace: 0.5,
         fontFace: look.bodyFont,
       });
       slide.addText(
@@ -679,30 +675,19 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
           w: 5,
           h: 3.95,
           fontSize: bodySize(15),
-          color: theme.text,
+          color: look.text,
           breakLine: true,
           paraSpaceAfter: 8,
           fontFace: look.bodyFont,
         },
       );
 
-      slide.addShape(pptx.ShapeType.roundRect, {
-        x: 4.8,
-        y: 6.93,
-        w: 3.74,
-        h: 0.45,
-        fill: { color: look.panel, transparency: 8 },
-        line: { color: "CCD7E8", pt: 1 },
-      });
-      slide.addText("Compare  |  Evaluate  |  Decide", {
-        x: 5.0,
-        y: 7.05,
-        w: 3.35,
-        h: 0.2,
-        align: "center",
-        fontSize: 10,
-        color: theme.text,
-        fontFace: look.bodyFont,
+      slide.addShape(pptx.ShapeType.line, {
+        x: 6.665,
+        y: 1.95,
+        w: 0,
+        h: 4.7,
+        line: { color: "D5DFEC", pt: 1 },
       });
     }
 
@@ -712,7 +697,7 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
         y: 1.02,
         w: 11.9,
         h: 5.96,
-        fill: { color: theme.surface, transparency: hasImage ? 22 : 3 },
+        fill: { color: look.surface, transparency: hasImage ? 22 : 3 },
         line: { color: "D1DBEA", pt: 1 },
       });
       slide.addShape(pptx.ShapeType.roundRect, {
@@ -739,7 +724,7 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
         h: 2.85,
         fontSize: titleSize(34),
         italic: true,
-        color: theme.text,
+        color: look.text,
         breakLine: true,
         fontFace: look.titleFont,
       });
@@ -750,16 +735,7 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
         h: 0.5,
         fontSize: 19,
         bold: true,
-        color: theme.muted,
-        fontFace: look.bodyFont,
-      });
-      slide.addText("Strategic message slide", {
-        x: 2.2,
-        y: 5.7,
-        w: 4.5,
-        h: 0.3,
-        fontSize: 11,
-        color: theme.muted,
+        color: look.muted,
         fontFace: look.bodyFont,
       });
     }
@@ -770,7 +746,7 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
         y: 1.5,
         w: 11.3,
         h: 4.6,
-        fill: { color: theme.surface, transparency: hasImage ? 18 : 2 },
+        fill: { color: look.surface, transparency: hasImage ? 18 : 2 },
         line: { color: "CFD9E8", pt: 1 },
       });
       slide.addShape(pptx.ShapeType.roundRect, {
@@ -781,57 +757,26 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
         fill: { color: look.accent, transparency: 4 },
         line: { color: look.accent, pt: 0 },
       });
-      slide.addText("FINAL FRAME", {
-        x: 4.73,
-        y: 2.03,
-        w: 3.85,
-        h: 0.18,
-        align: "center",
-        fontSize: 10,
-        bold: true,
-        color: theme.inverseText,
-        charSpace: 1,
-        fontFace: look.bodyFont,
-      });
       slide.addText(headingText, {
         x: 1.5,
         y: 2.66,
         w: 10.3,
         h: 1,
-        align: "center",
+        align: splitLayout ? "left" : centeredHeadings ? "center" : "left",
         fontSize: titleSize(40),
         bold: true,
-        color: theme.text,
+        color: look.text,
         fontFace: look.titleFont,
         italic: look.titleItalic,
-        charSpace: look.titleCharSpace,
       });
       slide.addText(slideData.content ?? slideData.subtitle ?? "", {
-        x: 2.2,
+        x: splitLayout ? 1.8 : centeredHeadings ? 2.2 : 1.8,
         y: 3.86,
-        w: 8.9,
+        w: splitLayout ? 9.8 : centeredHeadings ? 8.9 : 9.8,
         h: 0.9,
-        align: "center",
+        align: splitLayout ? "left" : centeredHeadings ? "center" : "left",
         fontSize: bodySize(19),
-        color: theme.muted,
-        fontFace: look.bodyFont,
-      });
-      slide.addShape(pptx.ShapeType.roundRect, {
-        x: 4.7,
-        y: 4.98,
-        w: 3.9,
-        h: 0.9,
-        fill: { color: look.panel, transparency: 7 },
-        line: { color: "CFD9E8", pt: 1 },
-      });
-      slide.addText("Q&A  |  Next Steps  |  Contact", {
-        x: 4.95,
-        y: 5.26,
-        w: 3.4,
-        h: 0.25,
-        align: "center",
-        fontSize: 11,
-        color: theme.text,
+        color: look.muted,
         fontFace: look.bodyFont,
       });
     }
@@ -839,7 +784,7 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
     if (slideData.speakerNotes) {
       slide.addNotes(`\n[Notes]\n${slideData.speakerNotes}`);
     }
-  });
+  }
 
   await pptx.writeFile({ fileName: "E-Z-PPT_Deck.pptx" });
 }
