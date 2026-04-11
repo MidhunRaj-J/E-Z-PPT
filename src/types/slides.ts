@@ -1,4 +1,5 @@
 export type Tone = "Professional" | "Creative" | "Minimalist";
+export type PptStyle = "Executive" | "Bold" | "Magazine";
 
 export type ApiProvider = "gemini" | "sarvam";
 

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const ToneSchema = z.enum(["Professional", "Creative", "Minimalist"]);
 export const ProviderSchema = z.enum(["gemini", "sarvam"]);
+export const PptStyleSchema = z.enum(["Executive", "Bold", "Magazine"]);
 
 export const SlideSchema = z
   .object({
@@ -62,5 +63,6 @@ export const DeckResponseSchema = z.object({
 
 export type ToneInput = z.infer<typeof ToneSchema>;
 export type ProviderInput = z.infer<typeof ProviderSchema>;
+export type PptStyleInput = z.infer<typeof PptStyleSchema>;
 export type SlideInput = z.infer<typeof SlideSchema>;
 export type DeckResponseInput = z.infer<typeof DeckResponseSchema>;

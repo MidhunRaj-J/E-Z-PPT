@@ -1,5 +1,5 @@
 import pptxgen from "pptxgenjs";
-import type { Slide, Tone } from "@/types/slides";
+import type { PptStyle, Slide, Tone } from "@/types/slides";
 
 type Theme = {
   bg: string;
@@ -33,6 +33,34 @@ type SlideLook = {
   titleAllCaps: boolean;
   titleItalic: boolean;
   titleCharSpace: number;
+};
+
+type StylePreset = {
+  titleBoost: number;
+  bodyBoost: number;
+  headlineWeight: "clean" | "bold" | "editorial";
+  accentIntensity: number;
+};
+
+const stylePresets: Record<PptStyle, StylePreset> = {
+  Executive: {
+    titleBoost: 0.94,
+    bodyBoost: 1.02,
+    headlineWeight: "clean",
+    accentIntensity: 0.6,
+  },
+  Bold: {
+    titleBoost: 1.16,
+    bodyBoost: 1,
+    headlineWeight: "bold",
+    accentIntensity: 1,
+  },
+  Magazine: {
+    titleBoost: 1.04,
+    bodyBoost: 1.03,
+    headlineWeight: "editorial",
+    accentIntensity: 0.75,
+  },
 };
 
 const accentColorMap: Record<string, string> = {
@@ -79,10 +107,10 @@ function resolveAccentColor(input: string | undefined, fallback: string) {
   return fallback;
 }
 
-function resolveSlideLook(slide: Slide, theme: Theme, index: number): SlideLook {
+function resolveSlideLook(slide: Slide, theme: Theme, index: number, pptStyle: PptStyle): SlideLook {
   const visualStyle = slide.design?.visualStyle ?? (index % 2 === 0 ? "modern" : "startup");
   const fonts = visualStyleFonts[visualStyle];
-  const accent = resolveAccentColor(slide.design?.accentColor, theme.accent);
+  const preset = stylePresets[pptStyle];
   const requestedTheme = slide.design?.theme;
 
   const bg =
@@ -157,11 +185,24 @@ function resolveSlideLook(slide: Slide, theme: Theme, index: number): SlideLook 
   };
 
   const cfg = conceptConfig[concept];
+  const titleFont =
+    preset.headlineWeight === "editorial"
+      ? "Georgia"
+      : preset.headlineWeight === "bold"
+        ? "Bahnschrift"
+        : cfg.titleFont || fonts.title;
+  const bodyFont = preset.headlineWeight === "editorial" ? "Cambria" : cfg.bodyFont || fonts.body;
+  const accent =
+    preset.accentIntensity >= 0.95
+      ? resolveAccentColor(slide.design?.accentColor, theme.accent)
+      : preset.accentIntensity <= 0.65
+        ? "3B82F6"
+        : resolveAccentColor(slide.design?.accentColor, theme.accent);
 
   return {
     accent,
-    titleFont: cfg.titleFont || fonts.title,
-    bodyFont: cfg.bodyFont || fonts.body,
+    titleFont,
+    bodyFont,
     bg,
     panel,
     surface,
@@ -172,8 +213,8 @@ function resolveSlideLook(slide: Slide, theme: Theme, index: number): SlideLook 
     layoutVariant: slide.design?.layoutVariant ?? "asymmetric",
     backgroundStyle: slide.design?.backgroundStyle ?? "minimal",
     concept,
-    titleScale: cfg.titleScale,
-    bodyScale: cfg.bodyScale,
+    titleScale: cfg.titleScale * preset.titleBoost,
+    bodyScale: cfg.bodyScale * preset.bodyBoost,
     titleAllCaps: cfg.titleAllCaps,
     titleItalic: cfg.titleItalic,
     titleCharSpace: cfg.titleCharSpace,
@@ -365,7 +406,7 @@ async function fetchImageAsDataUrl(url: string) {
   }
 }
 
-export async function downloadDeck(slides: Slide[], tone: Tone) {
+export async function downloadDeck(slides: Slide[], tone: Tone, pptStyle: PptStyle) {
   const pptx = new pptxgen();
   const theme = themes[tone];
   const imageDataCache = new Map<string, string | null>();
@@ -380,7 +421,7 @@ export async function downloadDeck(slides: Slide[], tone: Tone) {
     const slide = pptx.addSlide();
     const allowHeroImage = slideData.layout === "TITLE" || slideData.layout === "QUOTE" || slideData.layout === "CLOSING";
     const hasImage = Boolean(slideData.imageUrl && allowHeroImage);
-    const look = resolveSlideLook(slideData, theme, index);
+    const look = resolveSlideLook(slideData, theme, index, pptStyle);
     const heading = slideData.title || `Slide ${index + 1}`;
     const headingText = look.titleAllCaps ? heading.toUpperCase() : heading;
     const titleSize = (base: number) => Math.max(12, Math.round(base * look.titleScale));

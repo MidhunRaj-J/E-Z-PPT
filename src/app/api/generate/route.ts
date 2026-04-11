@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
-import { DeckResponseSchema, ProviderSchema, ToneSchema } from "@/lib/slide-schema";
+import { DeckResponseSchema, PptStyleSchema, ProviderSchema, ToneSchema } from "@/lib/slide-schema";
 
 type GeneratePayload = {
   prompt?: string;
   tone?: string;
   provider?: string;
   slideCount?: number;
+  style?: string;
 };
 
-function buildSystemPrompt(slideCount: number) {
+function buildSystemPrompt(slideCount: number, style: string) {
   return `You are a world-class presentation architect, UI/UX designer, and visual storyteller.
 
 Your job is to create premium, visually stunning slides that feel like Apple keynote + high-end startup pitch decks.
@@ -100,6 +101,12 @@ Speaker Notes:
 Tone:
 - Confident, bold, slightly dramatic.
 - Think: TED Talk + Apple + YC pitch deck.
+
+Style Direction:
+- Deck style preset: ${style}
+- If style is Executive: prioritize clean hierarchy, restrained accents, and boardroom readability.
+- If style is Bold: prioritize strong contrast, bigger headlines, and energetic visual rhythm.
+- If style is Magazine: prioritize editorial spacing, refined typography, and story-first pacing.
 
 Hard Constraints:
 - Start with TITLE and end with CLOSING.
@@ -1020,7 +1027,7 @@ async function enrichDeckWithImages(raw: unknown, prompt: string) {
   };
 }
 
-async function generateWithGemini(prompt: string, tone: string, slideCount: number) {
+async function generateWithGemini(prompt: string, tone: string, slideCount: number, style: string) {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
@@ -1037,14 +1044,14 @@ async function generateWithGemini(prompt: string, tone: string, slideCount: numb
     },
     body: JSON.stringify({
       systemInstruction: {
-        parts: [{ text: buildSystemPrompt(slideCount) }],
+        parts: [{ text: buildSystemPrompt(slideCount, style) }],
       },
       contents: [
         {
           role: "user",
           parts: [
             {
-              text: `Topic: ${prompt}\nTone: ${tone}\nSlide count: ${slideCount}\nAudience: General business audience.`,
+              text: `Topic: ${prompt}\nTone: ${tone}\nStyle: ${style}\nSlide count: ${slideCount}\nAudience: General business audience.`,
             },
           ],
         },
@@ -1071,7 +1078,7 @@ async function generateWithGemini(prompt: string, tone: string, slideCount: numb
   return content;
 }
 
-async function generateWithSarvam(prompt: string, tone: string, slideCount: number) {
+async function generateWithSarvam(prompt: string, tone: string, slideCount: number, style: string) {
   const apiKey = process.env.SARVAM_API_KEY;
 
   if (!apiKey) {
@@ -1092,10 +1099,10 @@ async function generateWithSarvam(prompt: string, tone: string, slideCount: numb
       temperature: 0.7,
       response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: buildSystemPrompt(slideCount) },
+        { role: "system", content: buildSystemPrompt(slideCount, style) },
         {
           role: "user",
-          content: `Topic: ${prompt}\nTone: ${tone}\nSlide count: ${slideCount}\nAudience: General business audience.`,
+          content: `Topic: ${prompt}\nTone: ${tone}\nStyle: ${style}\nSlide count: ${slideCount}\nAudience: General business audience.`,
         },
       ],
     }),
@@ -1122,6 +1129,7 @@ export async function POST(request: Request) {
     const prompt = body.prompt?.trim();
     const tone = body.tone?.trim();
     const provider = body.provider?.trim() ?? "gemini";
+    const style = body.style?.trim() ?? "Executive";
     const requestedSlideCount = body.slideCount;
 
     if (!prompt) {
@@ -1144,6 +1152,14 @@ export async function POST(request: Request) {
       );
     }
 
+    const parsedStyle = PptStyleSchema.safeParse(style);
+    if (!parsedStyle.success) {
+      return NextResponse.json(
+        { error: "Style must be Executive, Bold, or Magazine." },
+        { status: 400 },
+      );
+    }
+
     const slideCount =
       typeof requestedSlideCount === "number" && Number.isFinite(requestedSlideCount)
         ? Math.max(4, Math.min(30, Math.round(requestedSlideCount)))
@@ -1151,9 +1167,9 @@ export async function POST(request: Request) {
 
     let content: string;
     if (parsedProvider.data === "sarvam") {
-      content = await generateWithSarvam(prompt, parsedTone.data, slideCount);
+      content = await generateWithSarvam(prompt, parsedTone.data, slideCount, parsedStyle.data);
     } else {
-      content = await generateWithGemini(prompt, parsedTone.data, slideCount);
+      content = await generateWithGemini(prompt, parsedTone.data, slideCount, parsedStyle.data);
     }
 
     const parsedJson = parseJsonFromModelOutput(content);

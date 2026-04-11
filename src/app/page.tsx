@@ -1,27 +1,44 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { ArrowRight, Download, Orbit, Sparkles, WandSparkles } from "lucide-react";
+import { ArrowRight, Download, Moon, Orbit, Sparkles, Sun, WandSparkles } from "lucide-react";
 import { LoadingDeck } from "../components/loading-deck";
 import { SlidePreview } from "../components/slide-preview";
 import { downloadDeck } from "../lib/pptx";
-import type { ApiProvider, DeckResponse, Slide, Tone } from "../types/slides";
+import type { ApiProvider, DeckResponse, PptStyle, Slide, Tone } from "../types/slides";
 
 const tones: Tone[] = ["Professional", "Creative", "Minimalist"];
 const providers: Array<{ label: string; value: ApiProvider }> = [
   { label: "Google Gemini", value: "gemini" },
   { label: "Sarvam", value: "sarvam" },
 ];
+const pptStyles: PptStyle[] = ["Executive", "Bold", "Magazine"];
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [tone, setTone] = useState<Tone>("Professional");
   const [provider, setProvider] = useState<ApiProvider>("gemini");
+  const [pptStyle, setPptStyle] = useState<PptStyle>("Executive");
   const [slideCount, setSlideCount] = useState(8);
   const [slides, setSlides] = useState<Slide[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("ezppt-theme");
+    const dark = saved === "dark";
+    setIsDarkMode(dark);
+    document.documentElement.classList.toggle("theme-dark", dark);
+  }, []);
+
+  const toggleTheme = () => {
+    const next = !isDarkMode;
+    setIsDarkMode(next);
+    document.documentElement.classList.toggle("theme-dark", next);
+    localStorage.setItem("ezppt-theme", next ? "dark" : "light");
+  };
 
   const deckSummary = useMemo(() => {
     if (!slides.length) {
@@ -44,7 +61,7 @@ export default function Home() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: cleanedPrompt, tone, provider, slideCount }),
+        body: JSON.stringify({ prompt: cleanedPrompt, tone, provider, slideCount, style: pptStyle }),
       });
 
       const data = (await res.json()) as DeckResponse | { error?: string };
@@ -73,7 +90,7 @@ export default function Home() {
 
     setError(null);
     try {
-      await downloadDeck(slides, tone);
+      await downloadDeck(slides, tone, pptStyle);
     } catch {
       setError("Unable to create .pptx file. Try generating again.");
     }
@@ -81,6 +98,14 @@ export default function Home() {
 
   return (
     <main className="relative mx-auto w-full max-w-7xl px-4 py-10 sm:px-8">
+      <button
+        onClick={toggleTheme}
+        className="absolute right-4 top-4 z-20 inline-flex h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white/90 px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-400 hover:text-blue-700"
+      >
+        {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+        {isDarkMode ? "Light" : "Dark"} mode
+      </button>
+
       <div className="pointer-events-none absolute left-[5%] top-20 h-48 w-48 rounded-full bg-blue-400/20 blur-3xl anim-float" />
       <div className="pointer-events-none absolute right-[6%] top-36 h-56 w-56 rounded-full bg-cyan-300/20 blur-3xl anim-float" style={{ animationDelay: "1.1s" }} />
       <div className="pointer-events-none absolute bottom-10 right-1/3 h-44 w-44 rounded-full bg-indigo-300/18 blur-3xl anim-drift" />
@@ -146,7 +171,7 @@ export default function Home() {
             <span className="soft-chip">Fast generation</span>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1fr_180px_180px_180px_auto]">
+          <div className="grid gap-4 lg:grid-cols-[1fr_170px_170px_150px_150px_auto]">
             <div className="flex flex-col gap-2">
               <label htmlFor="deck-prompt" className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                 Presentation Topic
@@ -217,6 +242,24 @@ export default function Home() {
                     </option>
                   );
                 })}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label htmlFor="pptStyle" className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                PPT Style
+              </label>
+              <select
+                id="pptStyle"
+                value={pptStyle}
+                onChange={(e) => setPptStyle(e.target.value as PptStyle)}
+                className="h-12 rounded-2xl border border-slate-300 bg-white px-3 text-base font-semibold text-slate-900 outline-none transition focus:border-blue-500 focus:shadow-[0_0_0_3px_rgba(37,99,235,0.15)]"
+              >
+                {pptStyles.map((styleOption) => (
+                  <option key={styleOption} value={styleOption}>
+                    {styleOption}
+                  </option>
+                ))}
               </select>
             </div>
 
