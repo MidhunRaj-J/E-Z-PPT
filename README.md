@@ -109,12 +109,6 @@ Contributions are welcome.
 
 When creating issues, label beginner-friendly tasks with `good first issue`.
 
-## Launch Checklist
-
-- Add repository topics in GitHub settings (`nextjs`, `typescript`, `pptx`, `ai`, `productivity`)
-- Upload a social preview image in repo settings for better link sharing cards
-- Publish a demo video/GIF in the README hero section
-- Share launch post across X, Reddit, Show HN, and Product Hunt
 
 ## License
 
