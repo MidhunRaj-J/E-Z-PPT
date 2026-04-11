@@ -18,6 +18,7 @@ export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [tone, setTone] = useState<Tone>("Professional");
   const [provider, setProvider] = useState<ApiProvider>("gemini");
+  const [slideCount, setSlideCount] = useState(8);
   const [slides, setSlides] = useState<Slide[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +44,7 @@ export default function Home() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: cleanedPrompt, tone, provider }),
+        body: JSON.stringify({ prompt: cleanedPrompt, tone, provider, slideCount }),
       });
 
       const data = (await res.json()) as DeckResponse | { error?: string };
@@ -120,7 +121,7 @@ export default function Home() {
             </div>
             <div className="grid grid-cols-3 gap-2">
               <div className="card-lift rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-center">
-                <p className="font-mono text-sm font-bold text-slate-800">7-10</p>
+                <p className="font-mono text-sm font-bold text-slate-800">{slideCount}</p>
                 <p className="text-[10px] uppercase tracking-wide text-slate-500">Slides</p>
               </div>
               <div className="card-lift rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-center">
@@ -145,7 +146,7 @@ export default function Home() {
             <span className="soft-chip">Fast generation</span>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1fr_220px_220px_auto]">
+          <div className="grid gap-4 lg:grid-cols-[1fr_180px_180px_180px_auto]">
             <div className="flex flex-col gap-2">
               <label htmlFor="deck-prompt" className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                 Presentation Topic
@@ -195,6 +196,27 @@ export default function Home() {
                     {providerOption.label}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label htmlFor="slideCount" className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Slide Count
+              </label>
+              <select
+                id="slideCount"
+                value={slideCount}
+                onChange={(e) => setSlideCount(Number(e.target.value))}
+                className="h-12 rounded-2xl border border-slate-300 bg-white px-3 text-base font-semibold text-slate-900 outline-none transition focus:border-blue-500 focus:shadow-[0_0_0_3px_rgba(37,99,235,0.15)]"
+              >
+                {Array.from({ length: 9 }, (_, index) => {
+                  const count = index + 4;
+                  return (
+                    <option key={count} value={count}>
+                      {count} slides
+                    </option>
+                  );
+                })}
               </select>
             </div>
 

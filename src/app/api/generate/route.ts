@@ -5,9 +5,14 @@ type GeneratePayload = {
   prompt?: string;
   tone?: string;
   provider?: string;
+  slideCount?: number;
 };
 
-const systemPrompt = `You are a presentation architect.
+function buildSystemPrompt(slideCount: number) {
+  return `You are a world-class presentation architect, UI/UX designer, and visual storyteller.
+
+Your job is to create premium, visually stunning slides that feel like Apple keynote + high-end startup pitch decks.
+
 Return ONLY valid JSON in this exact shape:
 {
   "slides": [
@@ -16,7 +21,7 @@ Return ONLY valid JSON in this exact shape:
       "title": "string",
       "subtitle": "string optional",
       "content": "string optional",
-      "imageQuery": "string optional, 2-5 words, stock-photo style",
+      "imageQuery": "string (2-5 words, cinematic, visually rich)",
       "bullets": ["string"] optional,
       "leftTitle": "string optional",
       "leftBullets": ["string"] optional,
@@ -24,22 +29,70 @@ Return ONLY valid JSON in this exact shape:
       "rightBullets": ["string"] optional,
       "quote": "string optional",
       "quoteAuthor": "string optional",
-      "speakerNotes": "string optional"
+      "speakerNotes": "string optional",
+
+      "design": {
+        "theme": "dark | light | gradient | neon",
+        "accentColor": "string (e.g. blue, purple, orange)",
+        "backgroundStyle": "minimal | glassmorphism | gradient | abstract",
+        "visualStyle": "modern | futuristic | corporate | startup",
+        "emphasis": "title | numbers | contrast | minimal"
+      }
     }
   ]
 }
 
-Rules:
-- Build 7 to 10 slides.
+Core Mission:
+- Create slides that are NOT just informative, but visually premium and presentation-ready.
+- Each slide should feel like it was designed by a professional designer.
+
+Narrative Flow:
+- Follow a compelling arc: Hook -> Problem -> Insight -> Solution -> Impact -> Closing.
+- Make the audience feel progression, not just information.
+
+Content Rules:
+- Build exactly ${slideCount} slides.
+- Titles must be bold, curiosity-driven, and short (max 8 words).
+- Avoid generic headings like "Introduction" or "Conclusion".
+- Use sharp, high-impact bullet points (no fluff).
+- Include numbers, outcomes, or real-world examples whenever possible.
+
+Design Intelligence (CRITICAL):
+- Every slide must have a distinct visual identity.
+- Alternate between dark and light themes for contrast.
+- Use "gradient" or "neon" styles for high-impact slides (hook, solution, closing).
+- Keep text minimal - let design breathe.
+
+Layout Strategy:
+- TITLE slide -> cinematic, bold, minimal text.
+- BULLETS -> clean, structured, strong hierarchy.
+- TWO_COLUMN -> use for comparisons, before/after, problem/solution.
+- QUOTE -> emotional or powerful pause moment.
+- CLOSING -> memorable, inspirational, or action-driven.
+
+Image Strategy:
+- imageQuery must feel premium and cinematic:
+  BAD: "teamwork"
+  GOOD: "futuristic team collaboration neon lighting"
+
+- Images should enhance mood, not just illustrate content.
+
+Design Variation Rules:
+- Do NOT repeat same design settings across consecutive slides.
+- Mix styles: minimal -> bold -> futuristic -> clean -> dramatic.
+
+Speaker Notes:
+- Add short (1 sentence), natural, presenter-friendly guidance.
+
+Tone:
+- Confident, bold, slightly dramatic.
+- Think: TED Talk + Apple + YC pitch deck.
+
+Hard Constraints:
 - Start with TITLE and end with CLOSING.
-- Use a mix of BULLETS, TWO_COLUMN, and QUOTE in the middle.
-- Keep text concise and specific.
-- For BULLETS slides, provide 4 to 6 bullets with practical details.
-- For TWO_COLUMN slides, provide 3 to 5 bullets in each column.
-- Add imageQuery on every slide using concise stock-photo search terms (example: "modern office teamwork").
-- Include concrete examples, directional metrics, or outcomes whenever possible.
-- Add speakerNotes on most slides with a one-sentence presenter tip.
-- No markdown, no commentary, no code fences.`;
+- Output must be strictly valid JSON.
+- No markdown, no explanations, no extra text.`;
+}
 
 type GeminiResponse = {
   candidates?: Array<{
@@ -155,9 +208,18 @@ type LooseSlide = {
   rightTitle?: unknown;
   rightBullets?: unknown;
   quote?: unknown;
+  design?: unknown;
 };
 
 type SlideLayout = "TITLE" | "BULLETS" | "TWO_COLUMN" | "QUOTE" | "CLOSING";
+
+type NormalizedDesign = {
+  theme: "dark" | "light" | "gradient" | "neon";
+  accentColor: string;
+  backgroundStyle: "minimal" | "glassmorphism" | "gradient" | "abstract";
+  visualStyle: "modern" | "futuristic" | "corporate" | "startup";
+  emphasis: "title" | "numbers" | "contrast" | "minimal";
+};
 
 type UnsplashSearchResponse = {
   results?: Array<{
@@ -247,6 +309,76 @@ function normalizeLayoutValue(value: unknown): SlideLayout | null {
   return layoutMap[canonical] ?? null;
 }
 
+function normalizeToken(value: unknown) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function normalizeDesign(rawDesign: unknown, index: number): NormalizedDesign | undefined {
+  if (!rawDesign || typeof rawDesign !== "object") {
+    return undefined;
+  }
+
+  const design = rawDesign as Record<string, unknown>;
+  const themeToken = normalizeToken(design.theme);
+  const bgToken = normalizeToken(design.backgroundStyle);
+  const visualToken = normalizeToken(design.visualStyle);
+  const emphasisToken = normalizeToken(design.emphasis);
+
+  const themeMap: Record<string, NormalizedDesign["theme"]> = {
+    dark: "dark",
+    light: "light",
+    gradient: "gradient",
+    neon: "neon",
+    dark_mode: "dark",
+    light_mode: "light",
+  };
+
+  const backgroundMap: Record<string, NormalizedDesign["backgroundStyle"]> = {
+    minimal: "minimal",
+    glassmorphism: "glassmorphism",
+    glass: "glassmorphism",
+    gradient: "gradient",
+    abstract: "abstract",
+  };
+
+  const visualMap: Record<string, NormalizedDesign["visualStyle"]> = {
+    modern: "modern",
+    futuristic: "futuristic",
+    corporate: "corporate",
+    startup: "startup",
+    tech: "futuristic",
+  };
+
+  const emphasisMap: Record<string, NormalizedDesign["emphasis"]> = {
+    title: "title",
+    headline: "title",
+    headings: "title",
+    numbers: "numbers",
+    number: "numbers",
+    data: "numbers",
+    metrics: "numbers",
+    contrast: "contrast",
+    high_contrast: "contrast",
+    drama: "contrast",
+    minimal: "minimal",
+    clean: "minimal",
+    simplicity: "minimal",
+  };
+
+  const fallbackTheme: NormalizedDesign["theme"] = index % 2 === 0 ? "dark" : "light";
+
+  return {
+    theme: themeMap[themeToken] ?? fallbackTheme,
+    accentColor: asNonEmptyString(design.accentColor) ?? "blue",
+    backgroundStyle: backgroundMap[bgToken] ?? "minimal",
+    visualStyle: visualMap[visualToken] ?? "modern",
+    emphasis: emphasisMap[emphasisToken] ?? "contrast",
+  };
+}
+
 function inferLayoutFromSlide(slide: LooseSlide, index: number, totalSlides: number): SlideLayout {
   if (index === 0) {
     return "TITLE";
@@ -273,7 +405,9 @@ function normalizeDeckShape(raw: unknown) {
     return raw;
   }
 
-  const normalizedSlides = deck.slides.map((slide, index) => {
+  const sourceSlides = deck.slides;
+
+  const normalizedSlides = sourceSlides.map((slide, index) => {
     if (!slide || typeof slide !== "object") {
       return slide;
     }
@@ -281,13 +415,15 @@ function normalizeDeckShape(raw: unknown) {
     const loose = slide as LooseSlide;
     const title = asNonEmptyString(loose.title) ?? inferTitleFromSlide(loose, index);
     const imageQuery = asNonEmptyString(loose.imageQuery) ?? inferImageQueryFromSlide(loose, index);
-    const layout = normalizeLayoutValue(loose.layout) ?? inferLayoutFromSlide(loose, index, deck.slides!.length);
+    const layout = normalizeLayoutValue(loose.layout) ?? inferLayoutFromSlide(loose, index, sourceSlides.length);
+    const design = normalizeDesign(loose.design, index);
 
     return {
       ...loose,
       layout,
       title,
       imageQuery,
+      design,
     };
   });
 
@@ -329,6 +465,59 @@ function ensureMinimumSlides(raw: unknown, minimum = 4) {
   return {
     ...deck,
     slides: expandedSlides,
+  };
+}
+
+function ensureExactSlides(raw: unknown, target = 8) {
+  if (!raw || typeof raw !== "object") {
+    return raw;
+  }
+
+  const deck = raw as { slides?: Array<Record<string, unknown>> };
+  if (!Array.isArray(deck.slides)) {
+    return raw;
+  }
+
+  if (deck.slides.length === target) {
+    return raw;
+  }
+
+  if (deck.slides.length > target) {
+    if (target < 2) {
+      return { ...deck, slides: deck.slides.slice(0, target) };
+    }
+
+    const firstSlide = deck.slides[0];
+    const lastSlide = deck.slides[deck.slides.length - 1];
+    const middleCount = target - 2;
+    const middleSlides = deck.slides.slice(1, 1 + middleCount);
+
+    return {
+      ...deck,
+      slides: [firstSlide, ...middleSlides, lastSlide],
+    };
+  }
+
+  return ensureMinimumSlides(raw, target);
+}
+
+function enforceBoundaryLayouts(raw: unknown) {
+  if (!raw || typeof raw !== "object") {
+    return raw;
+  }
+
+  const deck = raw as { slides?: Array<Record<string, unknown>> };
+  if (!Array.isArray(deck.slides) || deck.slides.length === 0) {
+    return raw;
+  }
+
+  const slides = [...deck.slides];
+  slides[0] = { ...slides[0], layout: "TITLE" };
+  slides[slides.length - 1] = { ...slides[slides.length - 1], layout: "CLOSING" };
+
+  return {
+    ...deck,
+    slides,
   };
 }
 
@@ -396,7 +585,7 @@ async function enrichDeckWithUnsplash(raw: unknown) {
   };
 }
 
-async function generateWithGemini(prompt: string, tone: string) {
+async function generateWithGemini(prompt: string, tone: string, slideCount: number) {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
@@ -413,14 +602,14 @@ async function generateWithGemini(prompt: string, tone: string) {
     },
     body: JSON.stringify({
       systemInstruction: {
-        parts: [{ text: systemPrompt }],
+        parts: [{ text: buildSystemPrompt(slideCount) }],
       },
       contents: [
         {
           role: "user",
           parts: [
             {
-              text: `Topic: ${prompt}\nTone: ${tone}\nAudience: General business audience.`,
+              text: `Topic: ${prompt}\nTone: ${tone}\nSlide count: ${slideCount}\nAudience: General business audience.`,
             },
           ],
         },
@@ -447,7 +636,7 @@ async function generateWithGemini(prompt: string, tone: string) {
   return content;
 }
 
-async function generateWithSarvam(prompt: string, tone: string) {
+async function generateWithSarvam(prompt: string, tone: string, slideCount: number) {
   const apiKey = process.env.SARVAM_API_KEY;
 
   if (!apiKey) {
@@ -468,10 +657,10 @@ async function generateWithSarvam(prompt: string, tone: string) {
       temperature: 0.7,
       response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: buildSystemPrompt(slideCount) },
         {
           role: "user",
-          content: `Topic: ${prompt}\nTone: ${tone}\nAudience: General business audience.`,
+          content: `Topic: ${prompt}\nTone: ${tone}\nSlide count: ${slideCount}\nAudience: General business audience.`,
         },
       ],
     }),
@@ -498,6 +687,7 @@ export async function POST(request: Request) {
     const prompt = body.prompt?.trim();
     const tone = body.tone?.trim();
     const provider = body.provider?.trim() ?? "gemini";
+    const requestedSlideCount = body.slideCount;
 
     if (!prompt) {
       return NextResponse.json({ error: "Prompt is required." }, { status: 400 });
@@ -519,16 +709,23 @@ export async function POST(request: Request) {
       );
     }
 
+    const slideCount =
+      typeof requestedSlideCount === "number" && Number.isFinite(requestedSlideCount)
+        ? Math.max(4, Math.min(12, Math.round(requestedSlideCount)))
+        : 8;
+
     let content: string;
     if (parsedProvider.data === "sarvam") {
-      content = await generateWithSarvam(prompt, parsedTone.data);
+      content = await generateWithSarvam(prompt, parsedTone.data, slideCount);
     } else {
-      content = await generateWithGemini(prompt, parsedTone.data);
+      content = await generateWithGemini(prompt, parsedTone.data, slideCount);
     }
 
     const parsedJson = parseJsonFromModelOutput(content);
     const normalizedJson = normalizeDeckShape(parsedJson);
-    const repairedJson = ensureMinimumSlides(normalizedJson, 4);
+    const exactCountJson = ensureExactSlides(normalizedJson, slideCount);
+    const boundaryLayoutsJson = enforceBoundaryLayouts(exactCountJson);
+    const repairedJson = ensureMinimumSlides(boundaryLayoutsJson, 4);
     const enrichedJson = await enrichDeckWithUnsplash(repairedJson);
     const validated = DeckResponseSchema.parse(enrichedJson);
 

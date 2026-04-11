@@ -24,6 +24,13 @@ export type Slide = {
   quote?: string;
   quoteAuthor?: string;
   speakerNotes?: string;
+  design?: {
+    theme: "dark" | "light" | "gradient" | "neon";
+    accentColor: string;
+    backgroundStyle: "minimal" | "glassmorphism" | "gradient" | "abstract";
+    visualStyle: "modern" | "futuristic" | "corporate" | "startup";
+    emphasis: "title" | "numbers" | "contrast" | "minimal";
+  };
 };
 
 export type DeckResponse = {

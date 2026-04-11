@@ -19,6 +19,15 @@ export const SlideSchema = z
     quote: z.string().max(280).optional(),
     quoteAuthor: z.string().max(80).optional(),
     speakerNotes: z.string().max(500).optional(),
+    design: z
+      .object({
+        theme: z.enum(["dark", "light", "gradient", "neon"]),
+        accentColor: z.string().max(40),
+        backgroundStyle: z.enum(["minimal", "glassmorphism", "gradient", "abstract"]),
+        visualStyle: z.enum(["modern", "futuristic", "corporate", "startup"]),
+        emphasis: z.enum(["title", "numbers", "contrast", "minimal"]),
+      })
+      .optional(),
   })
   .superRefine((slide, ctx) => {
     if (slide.layout === "BULLETS" && (!slide.bullets || slide.bullets.length < 2)) {
