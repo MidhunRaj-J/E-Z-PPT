@@ -126,7 +126,12 @@ function resolveSlideLook(slide: Slide, theme: Theme, index: number, pptStyle: P
   const preset = stylePresets[pptStyle];
   const requestedTheme = slide.design?.theme;
   const isReferenceStyle = pptStyle === "Reference";
-  const referenceDarkLayout = slide.layout === "TITLE" || slide.layout === "QUOTE" || slide.layout === "CLOSING" || index % 2 === 0;
+  const referenceDarkLayout =
+    slide.layout === "TITLE" ||
+    slide.layout === "QUOTE" ||
+    slide.layout === "CLOSING" ||
+    slide.layout === "TWO_COLUMN" ||
+    index % 2 === 0;
 
   const bg =
     isReferenceStyle
@@ -149,6 +154,9 @@ function resolveSlideLook(slide: Slide, theme: Theme, index: number, pptStyle: P
   const inverseText = isReferenceStyle ? (isDarkTheme ? referencePalette.charcoal : referencePalette.cream) : isDarkTheme ? "0B1220" : theme.inverseText;
 
   const concept = ((): SlideLook["concept"] => {
+    if (isReferenceStyle) {
+      return "editorial";
+    }
     if (slide.design?.visualStyle === "futuristic") {
       return "tech_grid";
     }
@@ -206,13 +214,13 @@ function resolveSlideLook(slide: Slide, theme: Theme, index: number, pptStyle: P
   const cfg = conceptConfig[concept];
   const titleFont =
     isReferenceStyle
-      ? "Bahnschrift"
+      ? "Impact"
       : preset.headlineWeight === "editorial"
         ? "Georgia"
         : preset.headlineWeight === "bold"
           ? "Bahnschrift"
           : cfg.titleFont || fonts.title;
-  const bodyFont = isReferenceStyle ? "Calibri" : preset.headlineWeight === "editorial" ? "Cambria" : cfg.bodyFont || fonts.body;
+  const bodyFont = isReferenceStyle ? "Verdana" : preset.headlineWeight === "editorial" ? "Cambria" : cfg.bodyFont || fonts.body;
   const accent = isReferenceStyle
     ? resolveAccentColor(slide.design?.accentColor, referencePalette.rust)
     : preset.accentIntensity >= 0.95
@@ -233,13 +241,13 @@ function resolveSlideLook(slide: Slide, theme: Theme, index: number, pptStyle: P
     inverseText,
     emphasis: slide.design?.emphasis ?? "contrast",
     layoutVariant: slide.design?.layoutVariant ?? (isReferenceStyle ? "editorial" : "asymmetric"),
-    backgroundStyle: slide.design?.backgroundStyle ?? (isReferenceStyle ? "minimal" : "minimal"),
+    backgroundStyle: slide.design?.backgroundStyle ?? "minimal",
     concept,
-    titleScale: cfg.titleScale * preset.titleBoost,
-    bodyScale: cfg.bodyScale * preset.bodyBoost,
+    titleScale: (isReferenceStyle ? 1.2 : cfg.titleScale) * preset.titleBoost,
+    bodyScale: (isReferenceStyle ? 1.05 : cfg.bodyScale) * preset.bodyBoost,
     titleAllCaps: isReferenceStyle ? true : cfg.titleAllCaps,
     titleItalic: isReferenceStyle ? false : cfg.titleItalic,
-    titleCharSpace: isReferenceStyle ? 1 : cfg.titleCharSpace,
+    titleCharSpace: isReferenceStyle ? 2 : cfg.titleCharSpace,
   };
 }
 
@@ -350,6 +358,24 @@ function addBackgroundEffects(
 }
 
 function addReferenceScaffold(pptx: pptxgen, slide: pptxgen.Slide, look: SlideLook, index: number) {
+  slide.addShape(pptx.ShapeType.rect, {
+    x: 0,
+    y: 0,
+    w: 4.15,
+    h: 7.5,
+    fill: { color: look.accent, transparency: 88 },
+    line: { color: look.accent, pt: 0 },
+  });
+
+  slide.addShape(pptx.ShapeType.rect, {
+    x: 0,
+    y: 0,
+    w: 13.33,
+    h: 0.18,
+    fill: { color: look.accent, transparency: 0 },
+    line: { color: look.accent, pt: 0 },
+  });
+
   slide.addShape(pptx.ShapeType.line, {
     x: 12.28,
     y: 0.8,
@@ -508,7 +534,8 @@ export async function downloadDeck(slides: Slide[], tone: Tone, pptStyle: PptSty
     const headingText = look.titleAllCaps ? heading.toUpperCase() : heading;
     const titleSize = (base: number) => Math.max(12, Math.round(base * look.titleScale));
     const bodySize = (base: number) => Math.max(9, Math.round(base * look.bodyScale));
-    const centeredHeadings = look.layoutVariant === "centered" || look.concept === "clean_airy" || look.emphasis === "contrast";
+    const centeredHeadings =
+      !isReferenceStyle && (look.layoutVariant === "centered" || look.concept === "clean_airy" || look.emphasis === "contrast");
     const splitLayout = look.layoutVariant === "split";
     const editorialLayout = look.layoutVariant === "editorial";
     const titleHeadingX = centeredHeadings ? 1.1 : 1.35;
@@ -543,22 +570,24 @@ export async function downloadDeck(slides: Slide[], tone: Tone, pptStyle: PptSty
         });
       }
     } else {
-      slide.addShape(pptx.ShapeType.ellipse, {
-        x: -0.7,
-        y: -0.4,
-        w: 3.2,
-        h: 3.2,
-        fill: { color: look.accent, transparency: 88 },
-        line: { color: look.accent, pt: 0 },
-      });
-      slide.addShape(pptx.ShapeType.ellipse, {
-        x: 10.85,
-        y: 5.2,
-        w: 2.8,
-        h: 2.8,
-        fill: { color: look.accent, transparency: 90 },
-        line: { color: look.accent, pt: 0 },
-      });
+      if (!isReferenceStyle) {
+        slide.addShape(pptx.ShapeType.ellipse, {
+          x: -0.7,
+          y: -0.4,
+          w: 3.2,
+          h: 3.2,
+          fill: { color: look.accent, transparency: 88 },
+          line: { color: look.accent, pt: 0 },
+        });
+        slide.addShape(pptx.ShapeType.ellipse, {
+          x: 10.85,
+          y: 5.2,
+          w: 2.8,
+          h: 2.8,
+          fill: { color: look.accent, transparency: 90 },
+          line: { color: look.accent, pt: 0 },
+        });
+      }
     }
 
     addBackgroundEffects(pptx, slide, look);
