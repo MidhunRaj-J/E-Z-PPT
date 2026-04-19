@@ -107,6 +107,9 @@ Style Direction:
 - If style is Executive: prioritize clean hierarchy, restrained accents, and boardroom readability.
 - If style is Bold: prioritize strong contrast, bigger headlines, and energetic visual rhythm.
 - If style is Magazine: prioritize editorial spacing, refined typography, and story-first pacing.
+- If style is Reference: mimic the reference deck look with charcoal/cream/rust palette, geometric markers, right-side timeline dots, collage-like framed imagery, and strong asymmetrical placement.
+- Reference palette when style is Reference: background charcoal #383738 or cream #EAE4D4, accent rust #C84427, text cream on dark and charcoal on light.
+- Reference typography when style is Reference: condensed bold sans for titles and clean sans for body copy.
 
 Hard Constraints:
 - Start with TITLE and end with CLOSING.
@@ -246,6 +249,17 @@ type UnsplashSearchResponse = {
   results?: Array<{
     urls?: {
       regular?: string;
+    };
+  }>;
+};
+
+type PexelsSearchResponse = {
+  photos?: Array<{
+    src?: {
+      large2x?: string;
+      large?: string;
+      landscape?: string;
+      original?: string;
     };
   }>;
 };
@@ -790,7 +804,7 @@ function hashString(value: string) {
   return Math.abs(hash >>> 0);
 }
 
-function enforceDesignDirection(raw: unknown, seed: number) {
+function enforceDesignDirection(raw: unknown, seed: number, style: string) {
   if (!raw || typeof raw !== "object") {
     return raw;
   }
@@ -827,7 +841,16 @@ function enforceDesignDirection(raw: unknown, seed: number) {
     },
   ] as const;
 
-  const profile = profiles[seed % profiles.length];
+  const referenceProfile = {
+    themeCycle: ["dark", "light", "dark", "light", "dark", "light"] as NormalizedDesign["theme"][],
+    backgroundCycle: ["minimal", "abstract", "minimal", "gradient"] as NormalizedDesign["backgroundStyle"][],
+    visualCycle: ["corporate", "startup", "modern", "corporate"] as NormalizedDesign["visualStyle"][],
+    emphasisCycle: ["contrast", "title", "numbers", "contrast"] as NormalizedDesign["emphasis"][],
+    variantCycle: ["editorial", "split", "asymmetric", "editorial", "grid"] as NormalizedDesign["layoutVariant"][],
+    accentCycle: ["C84427", "C84427", "B53F25", "C84427", "D05A3E"],
+  } as const;
+
+  const profile = style === "Reference" ? referenceProfile : profiles[seed % profiles.length];
   const themeOffset = seed % profile.themeCycle.length;
   const bgOffset = (seed >> 2) % profile.backgroundCycle.length;
   const visualOffset = (seed >> 4) % profile.visualCycle.length;
@@ -852,19 +875,37 @@ function enforceDesignDirection(raw: unknown, seed: number) {
     };
 
     if (layout === "TITLE") {
-      design.theme = "gradient";
-      design.backgroundStyle = seed % 3 === 0 ? "gradient" : "glassmorphism";
-      design.visualStyle = seed % 2 === 0 ? "startup" : "futuristic";
-      design.emphasis = "title";
-      design.layoutVariant = seed % 2 === 0 ? "centered" : "editorial";
+      if (style === "Reference") {
+        design.theme = "dark";
+        design.backgroundStyle = "minimal";
+        design.visualStyle = "corporate";
+        design.emphasis = "title";
+        design.layoutVariant = "editorial";
+        design.accentColor = "C84427";
+      } else {
+        design.theme = "gradient";
+        design.backgroundStyle = seed % 3 === 0 ? "gradient" : "glassmorphism";
+        design.visualStyle = seed % 2 === 0 ? "startup" : "futuristic";
+        design.emphasis = "title";
+        design.layoutVariant = seed % 2 === 0 ? "centered" : "editorial";
+      }
     }
 
     if (layout === "CLOSING" || index === total - 1) {
-      design.theme = "gradient";
-      design.backgroundStyle = seed % 3 === 1 ? "abstract" : "gradient";
-      design.visualStyle = seed % 2 === 0 ? "futuristic" : "startup";
-      design.emphasis = "contrast";
-      design.layoutVariant = seed % 2 === 0 ? "split" : "centered";
+      if (style === "Reference") {
+        design.theme = "dark";
+        design.backgroundStyle = "minimal";
+        design.visualStyle = "corporate";
+        design.emphasis = "contrast";
+        design.layoutVariant = "split";
+        design.accentColor = "C84427";
+      } else {
+        design.theme = "gradient";
+        design.backgroundStyle = seed % 3 === 1 ? "abstract" : "gradient";
+        design.visualStyle = seed % 2 === 0 ? "futuristic" : "startup";
+        design.emphasis = "contrast";
+        design.layoutVariant = seed % 2 === 0 ? "split" : "centered";
+      }
     }
 
     const previous = index > 0 ? (slides[index - 1].design as Partial<NormalizedDesign> | undefined) : undefined;
@@ -951,6 +992,23 @@ async function fetchUnsplashImage(query: string, accessKey: string) {
   return result.results?.[0]?.urls?.regular ?? null;
 }
 
+async function fetchPexelsImage(query: string, apiKey: string) {
+  const endpoint = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&orientation=landscape&per_page=1&page=1`;
+  const response = await fetch(endpoint, {
+    headers: {
+      Authorization: apiKey,
+    },
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const result = (await response.json()) as PexelsSearchResponse;
+  const image = result.photos?.[0]?.src;
+  return image?.landscape ?? image?.large2x ?? image?.large ?? image?.original ?? null;
+}
+
 function sanitizeQueryForFallback(query: string) {
   return query
     .trim()
@@ -975,6 +1033,7 @@ async function enrichDeckWithImages(raw: unknown, prompt: string) {
   }
 
   const accessKey = process.env.UNSPLASH_ACCESS_KEY;
+  const pexelsKey = process.env.PEXELS_API_KEY;
 
   const deck = raw as { slides?: Array<Record<string, unknown>> };
   if (!Array.isArray(deck.slides)) {
@@ -999,6 +1058,10 @@ async function enrichDeckWithImages(raw: unknown, prompt: string) {
 
         if (accessKey) {
           imageUrl = await fetchUnsplashImage(imageQuery, accessKey);
+        }
+
+        if (!imageUrl && pexelsKey) {
+          imageUrl = await fetchPexelsImage(imageQuery, pexelsKey);
         }
 
         if (!imageUrl) {
@@ -1155,7 +1218,7 @@ export async function POST(request: Request) {
     const parsedStyle = PptStyleSchema.safeParse(style);
     if (!parsedStyle.success) {
       return NextResponse.json(
-        { error: "Style must be Executive, Bold, or Magazine." },
+        { error: "Style must be Executive, Bold, Magazine, or Reference." },
         { status: 400 },
       );
     }
@@ -1179,7 +1242,7 @@ export async function POST(request: Request) {
     const repairedLayoutsJson = ensureLayoutContentRequirements(boundaryLayoutsJson);
     const repairedJson = ensureMinimumSlides(repairedLayoutsJson, 4);
     const designSeed = hashString(`${prompt}|${parsedTone.data}|${slideCount}|${Date.now()}|${Math.random()}`);
-    const designDirectedJson = enforceDesignDirection(repairedJson, designSeed);
+    const designDirectedJson = enforceDesignDirection(repairedJson, designSeed, parsedStyle.data);
     const designSafeJson = ensureDesignSchemaSafety(designDirectedJson);
     const enrichedJson = await enrichDeckWithImages(designSafeJson, prompt);
     const validated = DeckResponseSchema.parse(enrichedJson);

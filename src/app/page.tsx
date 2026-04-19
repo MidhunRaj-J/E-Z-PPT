@@ -13,7 +13,7 @@ const providers: Array<{ label: string; value: ApiProvider }> = [
   { label: "Google Gemini", value: "gemini" },
   { label: "Sarvam", value: "sarvam" },
 ];
-const pptStyles: PptStyle[] = ["Executive", "Bold", "Magazine"];
+const pptStyles: PptStyle[] = ["Executive", "Bold", "Magazine", "Reference"];
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");

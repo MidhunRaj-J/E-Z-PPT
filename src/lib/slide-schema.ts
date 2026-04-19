@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const ToneSchema = z.enum(["Professional", "Creative", "Minimalist"]);
 export const ProviderSchema = z.enum(["gemini", "sarvam"]);
-export const PptStyleSchema = z.enum(["Executive", "Bold", "Magazine"]);
+export const PptStyleSchema = z.enum(["Executive", "Bold", "Magazine", "Reference"]);
 
 export const SlideSchema = z
   .object({

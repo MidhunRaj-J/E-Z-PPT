@@ -61,6 +61,19 @@ const stylePresets: Record<PptStyle, StylePreset> = {
     headlineWeight: "editorial",
     accentIntensity: 0.75,
   },
+  Reference: {
+    titleBoost: 1.08,
+    bodyBoost: 1,
+    headlineWeight: "bold",
+    accentIntensity: 1,
+  },
+};
+
+const referencePalette = {
+  charcoal: "383738",
+  cream: "EAE4D4",
+  rust: "C84427",
+  rustDeep: "B53F25",
 };
 
 const accentColorMap: Record<string, string> = {
@@ -112,9 +125,15 @@ function resolveSlideLook(slide: Slide, theme: Theme, index: number, pptStyle: P
   const fonts = visualStyleFonts[visualStyle];
   const preset = stylePresets[pptStyle];
   const requestedTheme = slide.design?.theme;
+  const isReferenceStyle = pptStyle === "Reference";
+  const referenceDarkLayout = slide.layout === "TITLE" || slide.layout === "QUOTE" || slide.layout === "CLOSING" || index % 2 === 0;
 
   const bg =
-    requestedTheme === "dark"
+    isReferenceStyle
+      ? referenceDarkLayout
+        ? referencePalette.charcoal
+        : referencePalette.cream
+      : requestedTheme === "dark"
       ? "0B1220"
       : requestedTheme === "neon"
         ? "071019"
@@ -122,12 +141,12 @@ function resolveSlideLook(slide: Slide, theme: Theme, index: number, pptStyle: P
           ? "EAF1FF"
           : theme.bg;
 
-  const isDarkTheme = requestedTheme === "dark" || requestedTheme === "neon";
-  const panel = isDarkTheme ? "1E293B" : theme.panel;
-  const surface = isDarkTheme ? "0F172A" : theme.surface;
-  const text = isDarkTheme ? "E2E8F0" : theme.text;
-  const muted = isDarkTheme ? "94A3B8" : theme.muted;
-  const inverseText = isDarkTheme ? "0B1220" : theme.inverseText;
+  const isDarkTheme = isReferenceStyle ? referenceDarkLayout : requestedTheme === "dark" || requestedTheme === "neon";
+  const panel = isReferenceStyle ? (isDarkTheme ? "4A4748" : "D9D0BE") : isDarkTheme ? "1E293B" : theme.panel;
+  const surface = isReferenceStyle ? (isDarkTheme ? "4A4748" : "F5EFE4") : isDarkTheme ? "0F172A" : theme.surface;
+  const text = isReferenceStyle ? (isDarkTheme ? referencePalette.cream : referencePalette.charcoal) : isDarkTheme ? "E2E8F0" : theme.text;
+  const muted = isReferenceStyle ? (isDarkTheme ? "D3CDBF" : "5A5551") : isDarkTheme ? "94A3B8" : theme.muted;
+  const inverseText = isReferenceStyle ? (isDarkTheme ? referencePalette.charcoal : referencePalette.cream) : isDarkTheme ? "0B1220" : theme.inverseText;
 
   const concept = ((): SlideLook["concept"] => {
     if (slide.design?.visualStyle === "futuristic") {
@@ -186,14 +205,17 @@ function resolveSlideLook(slide: Slide, theme: Theme, index: number, pptStyle: P
 
   const cfg = conceptConfig[concept];
   const titleFont =
-    preset.headlineWeight === "editorial"
-      ? "Georgia"
-      : preset.headlineWeight === "bold"
-        ? "Bahnschrift"
-        : cfg.titleFont || fonts.title;
-  const bodyFont = preset.headlineWeight === "editorial" ? "Cambria" : cfg.bodyFont || fonts.body;
-  const accent =
-    preset.accentIntensity >= 0.95
+    isReferenceStyle
+      ? "Bahnschrift"
+      : preset.headlineWeight === "editorial"
+        ? "Georgia"
+        : preset.headlineWeight === "bold"
+          ? "Bahnschrift"
+          : cfg.titleFont || fonts.title;
+  const bodyFont = isReferenceStyle ? "Calibri" : preset.headlineWeight === "editorial" ? "Cambria" : cfg.bodyFont || fonts.body;
+  const accent = isReferenceStyle
+    ? resolveAccentColor(slide.design?.accentColor, referencePalette.rust)
+    : preset.accentIntensity >= 0.95
       ? resolveAccentColor(slide.design?.accentColor, theme.accent)
       : preset.accentIntensity <= 0.65
         ? "3B82F6"
@@ -210,14 +232,14 @@ function resolveSlideLook(slide: Slide, theme: Theme, index: number, pptStyle: P
     muted,
     inverseText,
     emphasis: slide.design?.emphasis ?? "contrast",
-    layoutVariant: slide.design?.layoutVariant ?? "asymmetric",
-    backgroundStyle: slide.design?.backgroundStyle ?? "minimal",
+    layoutVariant: slide.design?.layoutVariant ?? (isReferenceStyle ? "editorial" : "asymmetric"),
+    backgroundStyle: slide.design?.backgroundStyle ?? (isReferenceStyle ? "minimal" : "minimal"),
     concept,
     titleScale: cfg.titleScale * preset.titleBoost,
     bodyScale: cfg.bodyScale * preset.bodyBoost,
-    titleAllCaps: cfg.titleAllCaps,
-    titleItalic: cfg.titleItalic,
-    titleCharSpace: cfg.titleCharSpace,
+    titleAllCaps: isReferenceStyle ? true : cfg.titleAllCaps,
+    titleItalic: isReferenceStyle ? false : cfg.titleItalic,
+    titleCharSpace: isReferenceStyle ? 1 : cfg.titleCharSpace,
   };
 }
 
@@ -327,6 +349,55 @@ function addBackgroundEffects(
   }
 }
 
+function addReferenceScaffold(pptx: pptxgen, slide: pptxgen.Slide, look: SlideLook, index: number) {
+  slide.addShape(pptx.ShapeType.line, {
+    x: 12.28,
+    y: 0.8,
+    w: 0,
+    h: 5.9,
+    line: { color: look.text, pt: 1, transparency: 12 },
+  });
+
+  for (let i = 0; i < 7; i += 1) {
+    const y = 1.1 + i * 0.85;
+    slide.addShape(pptx.ShapeType.ellipse, {
+      x: 12.13,
+      y,
+      w: 0.28,
+      h: 0.28,
+      fill: { color: i === index % 7 ? look.accent : look.text, transparency: i === index % 7 ? 0 : 14 },
+      line: { color: i === index % 7 ? look.accent : look.text, pt: 0 },
+    });
+  }
+
+  slide.addShape(pptx.ShapeType.rect, {
+    x: 0.58,
+    y: 0.55,
+    w: 0.38,
+    h: 0.38,
+    fill: { color: look.bg, transparency: 100 },
+    line: { color: look.accent, pt: 1.5 },
+  });
+
+  slide.addShape(pptx.ShapeType.rect, {
+    x: 11.52,
+    y: 6.46,
+    w: 0.38,
+    h: 0.38,
+    fill: { color: look.bg, transparency: 100 },
+    line: { color: look.accent, pt: 1.5 },
+  });
+
+  slide.addShape(pptx.ShapeType.rect, {
+    x: 0.9,
+    y: 6.92,
+    w: 11.1,
+    h: 0.05,
+    fill: { color: look.text, transparency: 26 },
+    line: { color: look.text, pt: 0 },
+  });
+}
+
 const themes: Record<Tone, Theme> = {
   Professional: {
     bg: "EEF3FB",
@@ -419,9 +490,20 @@ export async function downloadDeck(slides: Slide[], tone: Tone, pptStyle: PptSty
 
   for (const [index, slideData] of slides.entries()) {
     const slide = pptx.addSlide();
+    const isReferenceStyle = pptStyle === "Reference";
     const allowHeroImage = slideData.layout === "TITLE" || slideData.layout === "QUOTE" || slideData.layout === "CLOSING";
-    const hasImage = Boolean(slideData.imageUrl && allowHeroImage);
+    const hasHeroImage = Boolean(slideData.imageUrl && allowHeroImage && !isReferenceStyle);
     const look = resolveSlideLook(slideData, theme, index, pptStyle);
+    let imageData: string | null = null;
+
+    if (slideData.imageUrl) {
+      const imageUrl = slideData.imageUrl;
+      if (!imageDataCache.has(imageUrl)) {
+        imageDataCache.set(imageUrl, await fetchImageAsDataUrl(imageUrl));
+      }
+      imageData = imageDataCache.get(imageUrl) ?? null;
+    }
+
     const heading = slideData.title || `Slide ${index + 1}`;
     const headingText = look.titleAllCaps ? heading.toUpperCase() : heading;
     const titleSize = (base: number) => Math.max(12, Math.round(base * look.titleScale));
@@ -434,14 +516,7 @@ export async function downloadDeck(slides: Slide[], tone: Tone, pptStyle: PptSty
     const titleHeadingAlign: "left" | "center" = centeredHeadings ? "center" : "left";
 
     slide.background = { color: look.bg };
-    if (hasImage) {
-      const imageUrl = slideData.imageUrl as string;
-      if (!imageDataCache.has(imageUrl)) {
-        imageDataCache.set(imageUrl, await fetchImageAsDataUrl(imageUrl));
-      }
-
-      const imageData = imageDataCache.get(imageUrl);
-
+    if (hasHeroImage) {
       if (imageData) {
         slide.addImage({
           data: imageData,
@@ -487,6 +562,9 @@ export async function downloadDeck(slides: Slide[], tone: Tone, pptStyle: PptSty
     }
 
     addBackgroundEffects(pptx, slide, look);
+    if (isReferenceStyle) {
+      addReferenceScaffold(pptx, slide, look, index);
+    }
 
     if (look.layoutVariant === "asymmetric") {
       slide.addShape(pptx.ShapeType.rect, {
@@ -553,13 +631,22 @@ export async function downloadDeck(slides: Slide[], tone: Tone, pptStyle: PptSty
     }
 
     if (slideData.layout === "TITLE") {
+      if (isReferenceStyle && imageData) {
+        slide.addImage({
+          data: imageData,
+          x: 0.72,
+          y: 1.15,
+          w: 4.65,
+          h: 5.55,
+        });
+      }
       slide.addShape(pptx.ShapeType.roundRect, {
-        x: 1.05,
-        y: 1,
-        w: 11.2,
-        h: 5.75,
-        fill: { color: look.surface, transparency: hasImage ? 18 : 4 },
-        line: { color: "CED8E9", pt: 1 },
+        x: isReferenceStyle ? 5.6 : 1.05,
+        y: isReferenceStyle ? 1.02 : 1,
+        w: isReferenceStyle ? 6.2 : 11.2,
+        h: isReferenceStyle ? 5.7 : 5.75,
+        fill: { color: look.surface, transparency: hasHeroImage ? 18 : isReferenceStyle ? 12 : 4 },
+        line: { color: isReferenceStyle ? look.accent : "CED8E9", pt: 1 },
       });
       slide.addText(headingText, {
         x: titleHeadingX + 0.04,
@@ -588,19 +675,19 @@ export async function downloadDeck(slides: Slide[], tone: Tone, pptStyle: PptSty
         italic: look.titleItalic,
       });
       slide.addShape(pptx.ShapeType.roundRect, {
-        x: splitLayout ? 1.0 : 1.35,
+        x: isReferenceStyle ? 5.95 : splitLayout ? 1.0 : 1.35,
         y: 4.58,
-        w: splitLayout ? 11.2 : 8.35,
+        w: isReferenceStyle ? 5.45 : splitLayout ? 11.2 : 8.35,
         h: 1.2,
         fill: { color: look.panel, transparency: 8 },
-        line: { color: "D3DDEC", pt: 1 },
+        line: { color: isReferenceStyle ? look.text : "D3DDEC", pt: 1 },
       });
       slide.addText(slideData.content ?? slideData.subtitle ?? "", {
-        x: splitLayout ? 1.3 : centeredHeadings ? 1.4 : 1.65,
+        x: isReferenceStyle ? 6.2 : splitLayout ? 1.3 : centeredHeadings ? 1.4 : 1.65,
         y: 4.9,
-        w: splitLayout ? 10.6 : centeredHeadings ? 7.8 : 7.95,
+        w: isReferenceStyle ? 4.85 : splitLayout ? 10.6 : centeredHeadings ? 7.8 : 7.95,
         h: 0.78,
-        align: centeredHeadings ? "center" : "left",
+        align: isReferenceStyle ? "left" : centeredHeadings ? "center" : "left",
         fontSize: bodySize(18),
         color: look.muted,
         breakLine: true,
@@ -609,13 +696,22 @@ export async function downloadDeck(slides: Slide[], tone: Tone, pptStyle: PptSty
     }
 
     if (slideData.layout === "BULLETS") {
+      if (isReferenceStyle && imageData) {
+        slide.addImage({
+          data: imageData,
+          x: 8.58,
+          y: 1.2,
+          w: 3.2,
+          h: 4.55,
+        });
+      }
       slide.addShape(pptx.ShapeType.roundRect, {
         x: 0.9,
         y: 0.95,
-        w: 8.85,
+        w: isReferenceStyle ? 7.25 : 8.85,
         h: 5.95,
-        fill: { color: look.surface, transparency: hasImage ? 16 : 3 },
-        line: { color: "CFD9E8", pt: 1 },
+        fill: { color: look.surface, transparency: hasHeroImage ? 16 : isReferenceStyle ? 10 : 3 },
+        line: { color: isReferenceStyle ? look.text : "CFD9E8", pt: 1 },
       });
       slide.addText(headingText, {
         x: 1.2,
@@ -633,7 +729,7 @@ export async function downloadDeck(slides: Slide[], tone: Tone, pptStyle: PptSty
       slide.addText(bullets, {
         x: 1.2,
         y: 2.13,
-        w: 10.8,
+        w: isReferenceStyle ? 6.5 : 10.8,
         h: 4.4,
         fontSize: bodySize(16),
         color: look.text,
@@ -644,21 +740,30 @@ export async function downloadDeck(slides: Slide[], tone: Tone, pptStyle: PptSty
     }
 
     if (slideData.layout === "TWO_COLUMN") {
+      if (isReferenceStyle && imageData) {
+        slide.addImage({
+          data: imageData,
+          x: 0.92,
+          y: 0.95,
+          w: 2.45,
+          h: 1.15,
+        });
+      }
       slide.addShape(pptx.ShapeType.roundRect, {
         x: editorialLayout ? 0.7 : 0.9,
         y: 1.72,
         w: editorialLayout ? 5.94 : 5.74,
         h: 5,
-        fill: { color: look.surface, transparency: hasImage ? 16 : 3 },
-        line: { color: "CCD8E8", pt: 1 },
+        fill: { color: look.surface, transparency: hasHeroImage ? 16 : isReferenceStyle ? 8 : 3 },
+        line: { color: isReferenceStyle ? look.text : "CCD8E8", pt: 1 },
       });
       slide.addShape(pptx.ShapeType.roundRect, {
         x: editorialLayout ? 6.64 : 6.69,
         y: 1.72,
         w: editorialLayout ? 5.94 : 5.74,
         h: 5,
-        fill: { color: look.surface, transparency: hasImage ? 16 : 3 },
-        line: { color: "CCD8E8", pt: 1 },
+        fill: { color: look.surface, transparency: hasHeroImage ? 16 : isReferenceStyle ? 8 : 3 },
+        line: { color: isReferenceStyle ? look.text : "CCD8E8", pt: 1 },
       });
       slide.addText(headingText, {
         x: 0.9,
@@ -738,8 +843,8 @@ export async function downloadDeck(slides: Slide[], tone: Tone, pptStyle: PptSty
         y: 1.02,
         w: 11.9,
         h: 5.96,
-        fill: { color: look.surface, transparency: hasImage ? 22 : 3 },
-        line: { color: "D1DBEA", pt: 1 },
+        fill: { color: look.surface, transparency: hasHeroImage ? 22 : isReferenceStyle ? 14 : 3 },
+        line: { color: isReferenceStyle ? look.text : "D1DBEA", pt: 1 },
       });
       slide.addShape(pptx.ShapeType.roundRect, {
         x: 1.18,
@@ -782,13 +887,22 @@ export async function downloadDeck(slides: Slide[], tone: Tone, pptStyle: PptSty
     }
 
     if (slideData.layout === "CLOSING") {
+      if (isReferenceStyle && imageData) {
+        slide.addImage({
+          data: imageData,
+          x: 8.82,
+          y: 1.88,
+          w: 2.95,
+          h: 3.62,
+        });
+      }
       slide.addShape(pptx.ShapeType.roundRect, {
         x: 1,
         y: 1.5,
         w: 11.3,
         h: 4.6,
-        fill: { color: look.surface, transparency: hasImage ? 18 : 2 },
-        line: { color: "CFD9E8", pt: 1 },
+        fill: { color: look.surface, transparency: hasHeroImage ? 18 : isReferenceStyle ? 12 : 2 },
+        line: { color: isReferenceStyle ? look.text : "CFD9E8", pt: 1 },
       });
       slide.addShape(pptx.ShapeType.roundRect, {
         x: 4.58,

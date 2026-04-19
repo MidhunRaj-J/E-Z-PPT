@@ -31,8 +31,9 @@ Creating decent decks is usually repetitive and slow: outline ideas, write copy,
 
 - Prompt-driven deck generation with business-friendly structure
 - Tone presets: Professional, Creative, Minimalist
+- PPT style presets: Executive, Bold, Magazine, Reference
 - AI provider switch: Gemini or Sarvam
-- Automatic image enrichment from Unsplash (`imageQuery` -> `imageUrl`)
+- Automatic image enrichment from Unsplash/Pexels (`imageQuery` -> `imageUrl`)
 - Schema-driven output validation and normalization (Zod)
 - Live slide preview before export
 - High-quality PowerPoint export via `pptxgenjs`
@@ -62,6 +63,7 @@ SARVAM_MODEL=sarvam-m
 SARVAM_API_URL=https://api.sarvam.ai/v1/chat/completions
 
 UNSPLASH_ACCESS_KEY=your_unsplash_access_key_here
+PEXELS_API_KEY=your_pexels_api_key_here
 ```
 
 4. Run the app.
